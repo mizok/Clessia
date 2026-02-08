@@ -1,42 +1,10 @@
-<header class="shell-header">
-  <div class="shell-header__left">
-    <span class="shell-header__logo-icon">C</span>
-    <span class="shell-header__logo-text">Clessia</span>
-    <span class="shell-header__role-badge">家長</span>
-  </div>
-  <div class="shell-header__right">
-    @if (auth.roles().length > 1) {
-      <button
-        class="shell-header__role-switch"
-        pTooltip="你擁有多個角色，點擊即可切換"
-        tooltipPosition="bottom"
-        tooltipStyleClass="clessia-tooltip clessia-tooltip--role-switch"
-        appAutoOpenTooltip
-        [appAutoOpenTooltipEnterDelay]="500"
-        [appAutoOpenTooltipEnterDuration]="220"
-        [appAutoOpenTooltipLeaveDuration]="220"
-        (click)="auth.openRolePicker()"
-      >
-        <i class="pi pi-sync"></i>
-        切換角色
-      </button>
-    }
-    <span class="shell-header__user">
-      <i class="pi pi-user"></i>
-      {{ auth.profile()?.display_name || auth.user()?.email }}
-    </span>
-    <button class="shell-header__logout" (click)="signOut()">
-      <i class="pi pi-sign-out"></i>
-      登出
-    </button>
-  </div>
-</header>
-
-<main class="shell-content">
+<app-shell-layout>
   <div class="shell-placeholder">
     <i class="pi pi-users"></i>
     <h2>家長專區</h2>
     <p>出缺席、學習進度、繳費</p>
   </div>
-  <router-outlet />
-</main>
+  <div [@fadeAnimation]="getRouteAnimationData()" class="shell-route-wrapper">
+    <router-outlet />
+  </div>
+</app-shell-layout>

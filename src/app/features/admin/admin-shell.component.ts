@@ -1,19 +1,20 @@
-import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
-import { Tooltip } from 'primeng/tooltip';
-import { AuthService } from '../../core/auth.service';
-import { AutoOpenTooltipDirective } from '../../shared/directives/auto-open-tooltip.directive';
+import { Component, inject } from '@angular/core';
+import { RouterOutlet, ChildrenOutletContexts } from '@angular/router';
+import { ShellLayoutComponent } from '../../shared/components/layout/shell-layout/shell-layout.component';
+import { fadeAnimation } from '../../shared/animations';
 
 @Component({
   selector: 'app-admin-shell',
-  imports: [RouterOutlet, Tooltip, AutoOpenTooltipDirective],
+  standalone: true,
+  imports: [RouterOutlet, ShellLayoutComponent],
   templateUrl: './admin-shell.component.html',
   styleUrl: './admin-shell.component.scss',
+  animations: [fadeAnimation],
 })
 export class AdminShellComponent {
-  constructor(protected readonly auth: AuthService) {}
+  private readonly contexts = inject(ChildrenOutletContexts);
 
-  signOut() {
-    this.auth.signOut();
+  protected getRouteAnimationData() {
+    return this.contexts.getContext('primary')?.route?.snapshot?.data?.['animation'];
   }
 }

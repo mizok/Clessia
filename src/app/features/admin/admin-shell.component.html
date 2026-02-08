@@ -1,36 +1,5 @@
-<header class="admin-header">
-  <div class="admin-header__left">
-    <span class="admin-header__logo-icon">C</span>
-    <span class="admin-header__logo-text">Clessia</span>
+<app-shell-layout>
+  <div [@fadeAnimation]="getRouteAnimationData()" class="shell-route-wrapper">
+    <router-outlet />
   </div>
-  <div class="admin-header__right">
-    @if (auth.roles().length > 1) {
-      <button
-        class="admin-header__role-switch"
-        pTooltip="你擁有多個角色，點擊即可切換"
-        tooltipPosition="bottom"
-        tooltipStyleClass="clessia-tooltip clessia-tooltip--role-switch"
-        appAutoOpenTooltip
-        [appAutoOpenTooltipEnterDelay]="500"
-        [appAutoOpenTooltipEnterDuration]="220"
-        [appAutoOpenTooltipLeaveDuration]="220"
-        (click)="auth.openRolePicker()"
-      >
-        <i class="pi pi-sync"></i>
-        切換角色
-      </button>
-    }
-    <span class="admin-header__user">
-      <i class="pi pi-user"></i>
-      {{ auth.profile()?.display_name || auth.user()?.email }}
-    </span>
-    <button class="admin-header__logout" (click)="signOut()">
-      <i class="pi pi-sign-out"></i>
-      登出
-    </button>
-  </div>
-</header>
-
-<main class="admin-content">
-  <router-outlet />
-</main>
+</app-shell-layout>

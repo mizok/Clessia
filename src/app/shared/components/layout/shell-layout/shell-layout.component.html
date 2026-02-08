@@ -1,0 +1,110 @@
+<header class="shell-header">
+  <div class="shell-header__left">
+    <span class="shell-header__logo-icon">C</span>
+    <span class="shell-header__logo-text">Clessia</span>
+  </div>
+  <div class="shell-header__right">
+    @if (auth.activeRole(); as role) {
+      @if (auth.roles().length > 1) {
+        
+        @if(device.isTouchDevice()) {
+          <button
+          class="shell-header__role-badge shell-header__role-badge--{{ role }} shell-header__role-badge--interactive"
+          (click)="auth.openRolePicker()"
+        >
+          {{ roleLabels[role] }}
+          <i class="pi pi-chevron-down"></i>
+        </button>
+        }
+        @else{
+          <button
+          class="shell-header__role-badge shell-header__role-badge--{{ role }} shell-header__role-badge--interactive"
+          (click)="auth.openRolePicker()"
+          pTooltip="你擁有多個角色，點擊即可切換"
+          tooltipPosition="bottom"
+          tooltipStyleClass="clessia-tooltip clessia-tooltip--role-switch"
+          appAutoOpenTooltip
+          [appAutoOpenTooltipEnterDelay]="500"
+          [appAutoOpenTooltipEnterDuration]="220"
+          [appAutoOpenTooltipLeaveDuration]="220"
+        >
+          {{ roleLabels[role] }}
+          <i class="pi pi-chevron-down"></i>
+        </button>
+        }
+      } @else {
+        <span class="shell-header__role-badge shell-header__role-badge--{{ role }}">
+          {{ roleLabels[role] }}
+        </span>
+      }
+    }
+
+    <div class="shell-header__user" #userTrigger (click)="op.toggle($event, userTrigger)">
+      <app-jdenticon-avatar
+        class="shell-header__avatar"
+        [size]="30"
+        [value]="avatarSeed()"
+      />
+      <span class="shell-header__user-name">{{ auth.profile()?.display_name || auth.user()?.email }}</span>
+    </div>
+    
+    <p-popover #op styleClass="user-menu-overlay" appendTo="body">
+      <div class="user-menu">
+        <div class="user-menu__info">
+          <app-jdenticon-avatar
+            class="user-menu__avatar"
+            [size]="48"
+            [value]="avatarSeed()"
+          />
+          <div class="user-menu__text">
+            <span class="user-menu__name">{{ auth.profile()?.display_name || 'User' }}</span>
+            <span class="user-menu__email">{{ auth.user()?.email }}</span>
+          </div>
+        </div>
+        <hr class="user-menu__divider" />
+        <div class="user-menu__items">
+          <button class="user-menu__item" (click)="changePassword()">
+            <i class="pi pi-key"></i>
+            修改密碼
+          </button>
+          <button class="user-menu__item user-menu__item--danger" (click)="signOut()">
+            <i class="pi pi-sign-out"></i>
+            登出
+          </button>
+        </div>
+      </div>
+    </p-popover>
+
+    <!-- Mobile Hamburger -->
+    <button
+      class="hamburger hamburger--squeeze shell-header__hamburger"
+      [class.is-active]="sidebarOpen()"
+      type="button"
+      (click)="toggleSidebar()"
+    >
+      <span class="hamburger-box">
+        <span class="hamburger-inner"></span>
+      </span>
+    </button>
+  </div>
+</header>
+
+<section class="shell-layout" [class.menu-open]="sidebarOpen()">
+  <div class="shell-overlay" [class.is-open]="sidebarOpen()" (click)="toggleSidebar()"></div>
+
+  <div class="shell-container">
+    <aside class="shell-sidebar">
+      <!-- Mobile Close Button (Full width menu needs clear exit) -->
+      <div class="shell-sidebar__mobile-header">
+        <button class="shell-sidebar__close" (click)="toggleSidebar()">
+          <i class="pi pi-times"></i>
+          <span>關閉選單</span>
+        </button>
+      </div>
+      <ng-content select="[sidebar]"></ng-content>
+    </aside>
+    <main class="shell-content" [class.shell-content--centered]="centered()">
+      <ng-content></ng-content>
+    </main>
+  </div>
+</section>

@@ -6,8 +6,12 @@ import {
   inject,
   input,
   numberAttribute,
+  PLATFORM_ID,
 } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { Tooltip } from 'primeng/tooltip';
+import { ElementRef } from '@angular/core';
+import { DeviceService } from '../../core/device.service';
 
 @Directive({
   selector: '[appAutoOpenTooltip]',
@@ -15,6 +19,9 @@ import { Tooltip } from 'primeng/tooltip';
 })
 export class AutoOpenTooltipDirective implements AfterViewInit, OnDestroy {
   private readonly tooltip = inject(Tooltip, { self: true });
+  private readonly el = inject(ElementRef);
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly device = inject(DeviceService);
   readonly autoShow = input(true, { alias: 'appAutoOpenTooltip', transform: booleanAttribute });
   readonly initialDelay = input(0, {
     alias: 'appAutoOpenTooltipInitialDelay',
@@ -40,8 +47,76 @@ export class AutoOpenTooltipDirective implements AfterViewInit, OnDestroy {
   private leaveTimer: ReturnType<typeof setTimeout> | null = null;
   private enterFrameTimer: ReturnType<typeof setTimeout> | null = null;
   private leaveTransitionCleanup: (() => void) | null = null;
+  private documentClickListener: (() => void) | null = null;
+
+  constructor() {
+    if (isPlatformBrowser(this.platformId)) {
+      this.setupDocumentClickListener();
+    }
+  }
+
+  private setupDocumentClickListener(): void {
+    const handler = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!this.el.nativeElement.contains(target)) {
+        // Force close immediately without animation
+        this.clearAllTimers();
+        this.clearLeaveTransitionCleanup();
+        
+        const container = this.getTooltipContainer();
+        if (container) {
+          // Kill all transitions immediately by adding class
+          container.classList.add('clessia-tooltip--kill-animations');
+          
+          container.classList.remove('clessia-tooltip--leaving');
+          container.classList.remove('clessia-tooltip--pre-enter');
+          
+          // Reset styles variables
+          container.style.removeProperty('--clessia-tooltip-enter-duration');
+          container.style.removeProperty('--clessia-tooltip-leave-duration');
+
+          // Clean up inline styles from previous attempts
+          container.style.removeProperty('transition');
+          container.style.removeProperty('opacity');
+        }
+        
+        this.tooltip.hide();
+      }
+    };
+    
+    document.addEventListener('click', handler, true); // Use capture phase
+    this.documentClickListener = () => document.removeEventListener('click', handler, true);
+  }
+
+  private clearAllTimers(): void {
+    if (this.showTimer !== null) {
+      clearTimeout(this.showTimer);
+      this.showTimer = null;
+    }
+
+    if (this.hideTimer !== null) {
+      clearTimeout(this.hideTimer);
+      this.hideTimer = null;
+    }
+
+    if (this.leaveTimer !== null) {
+      clearTimeout(this.leaveTimer);
+      this.leaveTimer = null;
+    }
+
+    if (this.enterFrameTimer !== null) {
+      clearTimeout(this.enterFrameTimer);
+      this.enterFrameTimer = null;
+    }
+  }
 
   ngAfterViewInit(): void {
+    if (this.device.isTouchDevice()) {
+      this.tooltip.disabled = true;
+      this.tooltip.deactivate();
+      return;
+    }
+
     if (!this.autoShow()) {
       return;
     }
@@ -58,20 +133,11 @@ export class AutoOpenTooltipDirective implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (this.showTimer !== null) {
-      clearTimeout(this.showTimer);
-    }
+    this.clearAllTimers();
 
-    if (this.hideTimer !== null) {
-      clearTimeout(this.hideTimer);
-    }
-
-    if (this.leaveTimer !== null) {
-      clearTimeout(this.leaveTimer);
-    }
-
-    if (this.enterFrameTimer !== null) {
-      clearTimeout(this.enterFrameTimer);
+    if (this.documentClickListener) {
+      this.documentClickListener();
+      this.documentClickListener = null;
     }
 
     this.clearLeaveTransitionCleanup();

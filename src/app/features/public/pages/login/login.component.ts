@@ -1,7 +1,9 @@
-import { Component, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, signal, AfterViewInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../../core/auth.service';
+import { CaptchaService } from '../../../../core/captcha.service';
+import { environment } from '../../../../../environments/environment';
 
 @Component({
   selector: 'app-login',
@@ -9,24 +11,42 @@ import { AuthService } from '../../../../core/auth.service';
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
 })
-export class LoginComponent {
+export class LoginComponent implements AfterViewInit {
+  @ViewChild('turnstileContainer') turnstileContainer!: ElementRef;
+
   email = '';
   password = '';
   rememberMe = false;
   error = signal<string | null>(null);
   submitting = signal(false);
+  captchaToken = signal<string | null>(null);
 
   constructor(
     private readonly auth: AuthService,
     private readonly router: Router,
+    private readonly captcha: CaptchaService,
   ) {}
+
+  ngAfterViewInit() {
+    this.captcha.render(
+      this.turnstileContainer.nativeElement,
+      environment.turnstileSiteKey,
+      (token) => {
+        this.captchaToken.set(token);
+      },
+      {
+        appearance: 'always',
+        size: 'invisible',
+      },
+    );
+  }
 
   async onSubmit() {
     this.error.set(null);
     this.submitting.set(true);
 
     this.auth.setRememberMe(this.rememberMe);
-    const errorMsg = await this.auth.signIn(this.email, this.password);
+    const errorMsg = await this.auth.signIn(this.email, this.password, this.captchaToken() ?? undefined);
     this.submitting.set(false);
 
     if (errorMsg) {

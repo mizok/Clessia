@@ -117,6 +117,8 @@
 
   <!-- Content Panel (Right Side) -->
   <main class="public-shell__main">
-    <router-outlet />
+    <div [@fadeAnimation]="getRouteAnimationData()" class="shell-route-wrapper">
+      <router-outlet />
+    </div>
   </main>
 </section>

@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import type { User } from '@supabase/supabase-js';
 import { SupabaseService } from './supabase.service';
 
-export type UserRole = 'admin' | 'staff' | 'teacher' | 'parent';
+export type UserRole = 'admin' | 'teacher' | 'parent';
 
 export interface Profile {
   id: string;
@@ -16,6 +16,7 @@ export class AuthService {
   private readonly _user = signal<User | null>(null);
   private readonly _profile = signal<Profile | null>(null);
   private readonly _roles = signal<UserRole[]>([]);
+  private readonly _permissions = signal<string[]>([]);
   private readonly _activeRole = signal<UserRole | null>(null);
   private readonly _loading = signal(true);
   private readonly _showRolePicker = signal(false);
@@ -23,6 +24,7 @@ export class AuthService {
   readonly user = this._user.asReadonly();
   readonly profile = this._profile.asReadonly();
   readonly roles = this._roles.asReadonly();
+  readonly permissions = this._permissions.asReadonly();
   readonly activeRole = this._activeRole.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly isAuthenticated = computed(() => !!this._user());
@@ -42,6 +44,7 @@ export class AuthService {
     const {
       data: { session },
     } = await this.supabase.auth.getSession();
+
     if (session?.user) {
       this._user.set(session.user);
       await this.loadProfile(session.user.id);
@@ -56,7 +59,9 @@ export class AuthService {
       } else {
         this._profile.set(null);
         this._roles.set([]);
+        this._permissions.set([]);
         this._activeRole.set(null);
+        localStorage.removeItem('clessia:active-role');
       }
     });
   }
@@ -64,21 +69,45 @@ export class AuthService {
   private async loadProfile(userId: string) {
     const [profileResult, rolesResult] = await Promise.all([
       this.supabase.from('profiles').select('id, display_name, branch_id').eq('id', userId).single(),
-      this.supabase.from('user_roles').select('role').eq('user_id', userId),
+      this.supabase.from('user_roles').select('role, permissions').eq('user_id', userId),
     ]);
 
     this._profile.set(profileResult.data as Profile | null);
-    const roles = (rolesResult.data ?? []).map((r) => r.role as UserRole);
-    this._roles.set(roles);
+    
+    // Aggregate roles and permissions
+    const roles: UserRole[] = [];
+    const allPermissions = new Set<string>();
 
-    // Auto-select if user has exactly one role
+    (rolesResult.data ?? []).forEach((r) => {
+      roles.push(r.role as UserRole);
+      if (r.permissions && Array.isArray(r.permissions)) {
+        r.permissions.forEach((p: string) => allPermissions.add(p));
+      }
+    });
+
+    this._roles.set(roles);
+    this._permissions.set(Array.from(allPermissions));
+
+    // Auto-select if user has exactly one role, or restore from storage
     if (roles.length === 1) {
       this._activeRole.set(roles[0]);
+    } else {
+      const savedRole = localStorage.getItem('clessia:active-role') as UserRole | null;
+      if (savedRole && roles.includes(savedRole)) {
+        this._activeRole.set(savedRole);
+      }
     }
   }
 
   setActiveRole(role: UserRole) {
     this._activeRole.set(role);
+    localStorage.setItem('clessia:active-role', role);
+  }
+
+  hasPermission(permission: string): boolean {
+    // Super admins might have a wildcard '*' permission or we check for specific permissions
+    // Here we check if the requested permission exists in the user's permission set
+    return this.permissions().includes(permission) || this.permissions().includes('*');
   }
 
   openRolePicker() {
@@ -89,9 +118,13 @@ export class AuthService {
     this._showRolePicker.set(false);
   }
 
-  async signIn(email: string, password: string): Promise<string | null> {
-    const { data, error } = await this.supabase.auth.signInWithPassword({ email, password });
-    if (error) return error.message;
+  async signIn(email: string, password: string, captchaToken?: string): Promise<string | null> {
+    const { data, error } = await this.supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: { captchaToken },
+    });
+    if (error) return '帳號或密碼錯誤'; // Standardized error message
     if (data.user) {
       this._user.set(data.user);
       await this.loadProfile(data.user.id);
@@ -101,7 +134,6 @@ export class AuthService {
 
   private readonly shellMap: Record<UserRole, string> = {
     admin: '/admin',
-    staff: '/admin',
     teacher: '/teacher',
     parent: '/parent',
   };
@@ -116,9 +148,10 @@ export class AuthService {
     localStorage.setItem('clessia:remember-me', String(value));
   }
 
-  async sendPasswordReset(email: string): Promise<string | null> {
+  async sendPasswordReset(email: string, captchaToken?: string): Promise<string | null> {
     const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
+      captchaToken,
     });
     return error?.message ?? null;
   }
@@ -134,6 +167,7 @@ export class AuthService {
     this._user.set(null);
     this._profile.set(null);
     this._roles.set([]);
+    this._permissions.set([]);
     this._activeRole.set(null);
     this.router.navigate(['/login']);
   }

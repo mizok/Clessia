@@ -6,8 +6,9 @@ const REMEMBER_ME_KEY = 'clessia:remember-me';
 
 class ConditionalStorage {
   getItem(key: string): string | null {
-    const rememberMe = localStorage.getItem(REMEMBER_ME_KEY) === 'true';
-    return rememberMe ? localStorage.getItem(key) : sessionStorage.getItem(key);
+    // Check both storages to ensure session restoration regardless of current flag state
+    // Prioritize localStorage (persisted) if available
+    return localStorage.getItem(key) ?? sessionStorage.getItem(key);
   }
 
   setItem(key: string, value: string): void {

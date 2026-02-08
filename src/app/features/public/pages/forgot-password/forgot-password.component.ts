@@ -1,7 +1,9 @@
-import { Component, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, signal, AfterViewInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../../../core/auth.service';
+import { CaptchaService } from '../../../../core/captcha.service';
+import { environment } from '../../../../../environments/environment';
 
 @Component({
   selector: 'app-forgot-password',
@@ -9,19 +11,45 @@ import { AuthService } from '../../../../core/auth.service';
   templateUrl: './forgot-password.component.html',
   styleUrl: './forgot-password.component.scss',
 })
-export class ForgotPasswordComponent {
+export class ForgotPasswordComponent implements AfterViewInit {
+  @ViewChild('turnstileContainer') turnstileContainer!: ElementRef;
+
   email = '';
   submitting = signal(false);
   sent = signal(false);
   error = signal<string | null>(null);
+  captchaToken = signal<string | null>(null);
 
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly captcha: CaptchaService,
+  ) {}
+
+  ngAfterViewInit() {
+    this.captcha.render(
+      this.turnstileContainer.nativeElement,
+      environment.turnstileSiteKey,
+      (token) => {
+        this.captchaToken.set(token);
+      },
+      {
+        appearance: 'always',
+        size: 'invisible',
+      },
+    );
+  }
 
   async onSubmit() {
     this.error.set(null);
     this.submitting.set(true);
 
-    const errorMsg = await this.auth.sendPasswordReset(this.email);
+    if (!this.captchaToken()) {
+      this.error.set('請完成機器人驗證');
+      this.submitting.set(false);
+      return;
+    }
+
+    const errorMsg = await this.auth.sendPasswordReset(this.email, this.captchaToken()!);
     this.submitting.set(false);
 
     if (errorMsg) {

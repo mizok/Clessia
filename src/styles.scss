@@ -309,7 +309,7 @@ select {
 
 .public-shell__main {
   display: flex;
-  align-items: flex-start;
+  align-items: center; // Vertical centering
   justify-content: center;
   height: 100dvh;
   padding: var(--space-8);
@@ -322,10 +322,27 @@ select {
   }
 }
 
+/* Global Route Animation Wrapper */
+.shell-route-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex !important;
+  flex-direction: column;
+  align-items: center; // Standard centered logic
+  justify-content: center; // Standard centered logic
+  width: 100%;
+  min-height: 100%;
+  
+  // Ensure absolute children during transition are layered correctly
+  & > * {
+    width: 100%;
+  }
+}
+
 .public-shell__form-container {
   width: 100%;
   max-width: 480px;
-  margin: auto 0;
+  margin: auto; // Center both horizontally and vertically
   padding: var(--space-4) 0;
 }
 
@@ -610,6 +627,43 @@ select {
   transition-duration: var(--clessia-tooltip-leave-duration, 180ms);
   transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
 }
+
+.clessia-tooltip.p-tooltip.clessia-tooltip--kill-animations,
+.clessia-tooltip.p-tooltip.clessia-tooltip--kill-animations .p-tooltip-text {
+  transition: none !important;
+  opacity: 0 !important;
+  transform: none !important;
+  animation: none !important;
+}
+
+/* User Menu Popover Arrow Alignment Override */
+.user-menu-overlay {
+  background: #fff !important;
+  border: 1px solid var(--zinc-200) !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+  padding: 0 !important;
+}
+
+.user-menu-overlay::after
+{
+  left: auto !important;
+  right: 20px !important;
+  transform: translateX(-50%) !important;
+  display: block !important;
+  border-bottom-color: #fff !important;
+}
+
+.user-menu-overlay::before {
+  left: auto !important;
+  right: 17px !important;
+  transform: translateX(-50%) !important;
+  display: block !important;
+  border-bottom-color: var(--zinc-200) !important; // Match border
+}
+
+
+
+
 
 /* =============================================================================
    Responsive
