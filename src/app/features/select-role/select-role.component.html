@@ -1,0 +1,30 @@
+<div class="role-picker__backdrop" (click)="close()"></div>
+<div class="role-picker__panel">
+  <div class="role-picker__header">
+    <h2 class="role-picker__title">切換角色</h2>
+    <button class="role-picker__close" (click)="close()">
+      <i class="pi pi-times"></i>
+    </button>
+  </div>
+
+  <p class="role-picker__subtitle">{{ displayName() }}，請選擇要進入的角色</p>
+
+  <div class="role-picker__list">
+    @for (opt of roleOptions(); track opt.role) {
+      <button
+        class="role-picker__option"
+        [class.role-picker__option--active]="activeRole() === opt.role"
+        (click)="selectRole(opt.role)"
+      >
+        <i class="role-picker__option-icon pi" [class]="'pi ' + opt.icon"></i>
+        <div class="role-picker__option-text">
+          <span class="role-picker__option-label">{{ opt.label }}</span>
+          <span class="role-picker__option-desc">{{ opt.description }}</span>
+        </div>
+        @if (activeRole() === opt.role) {
+          <i class="role-picker__option-check pi pi-check"></i>
+        }
+      </button>
+    }
+  </div>
+</div>

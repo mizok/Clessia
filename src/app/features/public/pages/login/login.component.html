@@ -1,0 +1,66 @@
+<div class="public-shell__form-container">
+  <header class="public-shell__header">
+    <p class="public-shell__badge">管理系統</p>
+    <h1 class="public-shell__title">登入</h1>
+    <p class="public-shell__subtitle">請使用您的帳號密碼登入管理系統</p>
+  </header>
+
+  <form class="form" (ngSubmit)="onSubmit()">
+    @if (error()) {
+      <div class="message message--error">
+        <i class="pi pi-exclamation-circle"></i>
+        {{ error() }}
+      </div>
+    }
+
+    <div class="form__field">
+      <label class="form__label" for="email">Email</label>
+      <input
+        id="email"
+        type="email"
+        class="form__input"
+        placeholder="輸入 Email"
+        [(ngModel)]="email"
+        name="email"
+        required
+        autocomplete="email"
+      />
+    </div>
+
+    <div class="form__field">
+      <label class="form__label" for="password">密碼</label>
+      <input
+        id="password"
+        type="password"
+        class="form__input"
+        placeholder="輸入密碼"
+        [(ngModel)]="password"
+        name="password"
+        required
+        autocomplete="current-password"
+      />
+    </div>
+
+    <div class="form__row">
+      <label class="form__checkbox">
+        <input type="checkbox" [(ngModel)]="rememberMe" name="rememberMe" />
+        <span>記住我</span>
+      </label>
+      <a class="form__link" routerLink="/forgot-password">忘記密碼？</a>
+    </div>
+
+    <button
+      type="submit"
+      class="form__submit"
+      [disabled]="submitting() || !email || !password"
+    >
+      @if (submitting()) {
+        <i class="pi pi-spinner pi-spin"></i>
+        登入中...
+      } @else {
+        <i class="pi pi-sign-in"></i>
+        登入
+      }
+    </button>
+  </form>
+</div>
