@@ -1,9 +1,4 @@
-<app-shell-layout>
-  <div class="shell-placeholder">
-    <i class="pi pi-book"></i>
-    <h2>任課老師專區</h2>
-    <p>課表、點名、學生學習紀錄</p>
-  </div>
+<app-shell-layout [navItems]="navItems">
   <div [@fadeAnimation]="getRouteAnimationData()" class="shell-route-wrapper">
     <router-outlet />
   </div>

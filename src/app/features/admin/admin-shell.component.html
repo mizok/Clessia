@@ -1,4 +1,4 @@
-<app-shell-layout>
+<app-shell-layout [navItems]="navItems">
   <div [@fadeAnimation]="getRouteAnimationData()" class="shell-route-wrapper">
     <router-outlet />
   </div>

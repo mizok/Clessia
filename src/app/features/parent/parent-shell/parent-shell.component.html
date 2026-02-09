@@ -1,9 +1,4 @@
-<app-shell-layout>
-  <div class="shell-placeholder">
-    <i class="pi pi-users"></i>
-    <h2>家長專區</h2>
-    <p>出缺席、學習進度、繳費</p>
-  </div>
+<app-shell-layout [navItems]="navItems">
   <div [@fadeAnimation]="getRouteAnimationData()" class="shell-route-wrapper">
     <router-outlet />
   </div>

@@ -43,7 +43,13 @@
       "Bash(npm view:*)",
       "Bash(bash:*)",
       "Bash(claude mcp remove:*)",
-      "Bash(claude mcp list:*)"
+      "Bash(claude mcp list:*)",
+      "Bash(export PATH:*)",
+      "Bash(/Users/mizokhuangmbp2023/.nvm/versions/node/v22.14.0/bin/npx ng build)",
+      "Bash(node_modules/.bin/ng build:*)",
+      "Bash(export PATH=\"/usr/local/bin:/opt/homebrew/bin:$PATH\")",
+      "Bash(PATH=\"/Users/mizokhuangmbp2023/.nvm/versions/node/v22.19.0/bin:$PATH\" npx ng build:*)",
+      "Bash(PATH=\"/Users/mizokhuangmbp2023/.nvm/versions/node/v22.19.0/bin:$PATH\" node:*)"
     ]
   }
 }
