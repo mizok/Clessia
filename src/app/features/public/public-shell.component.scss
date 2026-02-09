@@ -1,1 +1,415 @@
-// Redundant styles removed. Using global .shell-route-wrapper in styles.scss.
+@keyframes pub-nav-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.public-shell {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  height: 100dvh;
+  overflow: hidden;
+
+  &__brand {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100dvh;
+    padding: var(--space-8);
+    background: linear-gradient(160deg, var(--zinc-900) 0%, var(--zinc-800) 100%);
+    color: #fff;
+    overflow: hidden;
+
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    &::before {
+      top: -100px;
+      right: -80px;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgb(14 165 233 / 30%) 0%, transparent 70%);
+    }
+
+    &::after {
+      bottom: -50px;
+      left: -50px;
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, rgb(14 165 233 / 20%) 0%, transparent 70%);
+    }
+  }
+
+  &__brand-content {
+    position: relative;
+    z-index: 1;
+  }
+
+  &__logo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-8);
+    text-decoration: none;
+    color: inherit;
+  }
+
+  &__logo-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    font-size: var(--text-xl);
+    font-weight: var(--font-bold);
+    color: var(--zinc-900);
+    background: linear-gradient(135deg, #fff 0%, var(--zinc-200) 100%);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+  }
+
+  &__logo-text {
+    font-size: var(--text-2xl);
+    font-weight: var(--font-bold);
+    letter-spacing: -0.02em;
+  }
+
+  &__tagline {
+    margin: 0 0 var(--space-2) 0;
+    font-size: var(--text-3xl);
+    font-weight: var(--font-bold);
+    line-height: var(--leading-tight);
+  }
+
+  &__slogan {
+    margin: 0 0 var(--space-8) 0;
+    font-size: var(--text-lg);
+    color: var(--zinc-400);
+  }
+
+  &__features {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    list-style: none;
+  }
+
+  &__feature {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: var(--text-md);
+    color: var(--zinc-300);
+
+    i {
+      color: var(--accent-400);
+      font-size: 18px;
+    }
+  }
+
+  &__nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  &__nav-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--text-md);
+    color: var(--zinc-400);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    animation: pub-nav-in 0.25s ease both;
+    transition:
+      color var(--transition-fast),
+      background var(--transition-fast);
+
+    &:nth-child(1) {
+      animation-delay: 0s;
+    }
+    &:nth-child(2) {
+      animation-delay: 0.07s;
+    }
+    &:nth-child(3) {
+      animation-delay: 0.14s;
+    }
+    &:nth-child(4) {
+      animation-delay: 0.21s;
+    }
+
+    i {
+      font-size: 18px;
+      width: 20px;
+      text-align: center;
+    }
+
+    &:hover {
+      color: #fff;
+      background: rgb(255 255 255 / 8%);
+    }
+
+    &--active {
+      color: #fff;
+      background: rgb(255 255 255 / 10%);
+    }
+  }
+
+  &__copyright {
+    position: relative;
+    z-index: 1;
+    font-size: var(--text-sm);
+    color: var(--zinc-500);
+  }
+
+  /* Hamburger - hidden on desktop */
+  &__hamburger.hamburger {
+    display: none;
+  }
+
+  /* Mobile sidebar + overlay - hidden on desktop */
+  &__overlay,
+  &__sidebar {
+    display: none;
+  }
+
+  &__main {
+    display: flex;
+    align-items: center; // Vertical centering
+    justify-content: center;
+    height: 100dvh;
+    padding: var(--space-8);
+    background: var(--zinc-50);
+    overflow-y: auto;
+
+    /* router-outlet 插入的 host element 不應影響佈局 */
+    > :not(router-outlet) {
+      display: contents;
+    }
+  }
+
+
+}
+
+/* Global Route Animation Wrapper */
+.shell-route-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex !important;
+  flex-direction: column;
+  align-items: center; // Standard centered logic
+  justify-content: center; // Standard centered logic
+  width: 100%;
+  min-height: 100%;
+}
+
+/* =============================================================================
+   Responsive
+   ============================================================================= */
+@media (max-width: 1024px) {
+  .public-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+
+    &__brand {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      height: auto;
+      padding: var(--space-2) var(--space-4);
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      overflow: visible;
+
+      &::before,
+      &::after {
+        display: none;
+      }
+    }
+
+    &__brand-content {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    &__logo {
+      margin-bottom: 0;
+    }
+
+    &__logo-icon {
+      width: 28px;
+      height: 28px;
+      font-size: var(--text-sm);
+    }
+
+    &__logo-text {
+      font-size: var(--text-md);
+    }
+
+    &__tagline,
+    &__slogan,
+    &__features,
+    &__nav,
+    &__copyright {
+      display: none;
+    }
+
+    &__hamburger.hamburger {
+      display: flex;
+      padding: 0;
+      transform: scale(0.5);
+      z-index: 12;
+
+      .hamburger-inner,
+      .hamburger-inner::before,
+      .hamburger-inner::after {
+        background-color: var(--zinc-400);
+      }
+
+      &:hover {
+        .hamburger-inner,
+        .hamburger-inner::before,
+        .hamburger-inner::after {
+          background-color: #fff;
+        }
+      }
+
+      &--active {
+        .hamburger-inner,
+        .hamburger-inner::before,
+        .hamburger-inner::after {
+          background-color: #fff;
+        }
+      }
+    }
+
+    /* Push-content: entire page shifts right when menu opens */
+    position: relative;
+    background: var(--zinc-50);
+    transition: transform 0.3s ease;
+
+    &--menu-open {
+      transform: translateX(280px);
+    }
+
+    /* Overlay on shifted content (fixed becomes relative to parent due to transform) */
+    &__overlay {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      background: rgb(0 0 0 / 0%);
+      pointer-events: none;
+      transition: background 0.3s ease;
+
+      &--open {
+        pointer-events: auto;
+        background: rgb(0 0 0 / 30%);
+      }
+    }
+
+    /* Sidebar: absolute-positioned to the left, revealed when parent slides right */
+    &__sidebar {
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      top: 0;
+      left: -280px;
+      width: 280px;
+      min-height: 100dvh;
+      padding: var(--space-4);
+      color: #fff;
+      background: var(--zinc-900);
+    }
+  }
+
+  .public-shell__sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-6);
+
+    .public-shell__logo {
+      color: #fff;
+      margin-bottom: 0;
+    }
+
+    .public-shell__logo-icon {
+      width: 32px;
+      height: 32px;
+      font-size: var(--text-md);
+    }
+
+    .public-shell__logo-text {
+      font-size: var(--text-lg);
+    }
+  }
+
+  .public-shell__sidebar-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--zinc-400);
+    font-size: 18px;
+    border-radius: var(--radius-md);
+    transition:
+      color 0.2s,
+      background 0.2s;
+
+    &:hover {
+      color: #fff;
+      background: rgb(255 255 255 / 10%);
+    }
+  }
+
+  .public-shell__sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--text-md);
+    color: var(--zinc-400);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-1);
+    transition:
+      color 0.2s,
+      background 0.2s;
+
+    i {
+      font-size: 18px;
+      width: 20px;
+      text-align: center;
+    }
+
+    &:hover {
+      color: #fff;
+      background: rgb(255 255 255 / 8%);
+    }
+
+    &--active {
+      color: #fff;
+      background: rgb(255 255 255 / 10%);
+    }
+  }
+}

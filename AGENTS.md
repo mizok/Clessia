@@ -177,7 +177,7 @@ src/app/
 | Angular 效能優化（@defer, httpResource, zoneless）     | `angular-best-practices-v20`          |
 | 處理 RxJS（Observable, Subject, operators）            | `angular-rxjs-patterns`               |
 | 設計 DI 架構（providers, injection tokens）            | `angular-dependency-injection`        |
-| 寫或 review SCSS / CSS（BEM 命名、component styles）   | `angular-css-bem-best-practices`      |
+| 寫或 review SCSS / CSS（BEM 命名、component styles）   | `angular-scss-bem-standards`      |
 | 設計 UI / 頁面佈局 / 視覺風格                          | `ui-ux-pro-max`                       |
 | 排版、色彩、spacing、字型搭配                          | `visual-design-foundations`           |
 | 建立前端頁面或美化 UI                                  | `frontend-design`                     |

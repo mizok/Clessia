@@ -10,6 +10,7 @@ import { environment } from '../../../../../environments/environment';
   imports: [FormsModule, RouterLink],
   templateUrl: './forgot-password.component.html',
   styleUrl: './forgot-password.component.scss',
+  host: { class: 'centered-flex' },
 })
 export class ForgotPasswordComponent implements AfterViewInit {
   @ViewChild('turnstileContainer') turnstileContainer!: ElementRef;

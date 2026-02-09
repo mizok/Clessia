@@ -1,0 +1,183 @@
+// 桌面版隱藏
+.bottom-bar {
+  display: none;
+
+  &__overlay {
+    display: none;
+  }
+
+  &__sheet {
+    display: none;
+  }
+}
+
+// 行動版顯示
+@media (max-width: 640px) {
+  .bottom-bar {
+    display: flex;
+    flex-direction: column; // Change to column to allow stacking if needed, though mostly for the container
+    justify-content: flex-end; // Align tabs to bottom
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 120;
+    // Remove height/padding/bg from container so it doesn't block clicks in upper space (though overlay handles that)
+    pointer-events: none; // Allow clicks to pass through empty space (e.g. above tabs)
+
+    &__tabs {
+      display: flex;
+      width: 100%;
+      height: 64px;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      background: #fff;
+      border-top: 1px solid var(--zinc-200);
+      position: relative;
+      z-index: 110; // Higher than sheet (105)
+      pointer-events: auto; // Re-enable clicks
+    }
+
+    &__tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      color: var(--zinc-400);
+      text-decoration: none;
+      font-size: 10px;
+      font-weight: var(--font-medium);
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      transition: color var(--transition-fast);
+      padding: 0;
+
+      i {
+        font-size: 22px;
+      }
+
+      &--active {
+        color: var(--accent-500);
+      }
+    }
+
+    // ─ More Overlay ─
+    &__overlay {
+      display: block;
+      position: fixed;
+      inset: 0;
+      bottom: 64px;
+      background: rgb(0 0 0 / 40%);
+      z-index: 100;
+      animation: fade-in 0.25s ease-out;
+
+      &--closing {
+        animation: fade-out 0.2s ease-in forwards;
+      }
+    }
+
+    // ─ More Sheet ─
+    &__sheet {
+      display: block;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 64px;
+      background: #fff;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      z-index: 105;
+      padding: var(--space-2) var(--space-4) var(--space-4);
+      animation: sheet-up 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+
+      &--closing {
+        animation: sheet-down 0.35s ease-out forwards;
+      }
+    }
+
+    &__sheet-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--zinc-200);
+      border-radius: var(--radius-full);
+      margin: var(--space-2) auto var(--space-4);
+    }
+
+    &__sheet-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-2);
+    }
+
+    &__sheet-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-2);
+      border-radius: var(--radius-lg);
+      color: var(--zinc-600);
+      text-decoration: none;
+      font-size: var(--text-xs);
+      font-weight: var(--font-medium);
+      transition: all var(--transition-fast);
+      text-align: center;
+
+      i {
+        font-size: 24px;
+      }
+
+      &:hover,
+      &--active {
+        background: var(--accent-50);
+        color: var(--accent-600);
+      }
+    }
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes sheet-down {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}

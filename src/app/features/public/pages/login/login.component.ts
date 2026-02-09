@@ -10,6 +10,7 @@ import { environment } from '../../../../../environments/environment';
   imports: [FormsModule, RouterLink],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
+  host: { class: 'centered-flex' },
 })
 export class LoginComponent implements AfterViewInit {
   @ViewChild('turnstileContainer') turnstileContainer!: ElementRef;

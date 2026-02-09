@@ -5,6 +5,7 @@ import { Component } from '@angular/core';
   imports: [],
   templateUrl: './qr-checkin.component.html',
   styleUrl: './qr-checkin.component.scss',
+  host: { class: 'centered-flex' },
 })
 export class QrCheckinComponent {
 

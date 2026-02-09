@@ -9,6 +9,7 @@ import { AuthService } from '../../../../core/auth.service';
   imports: [FormsModule],
   templateUrl: './change-password.component.html',
   styleUrl: './change-password.component.scss',
+  host: { class: 'centered-flex' },
 })
 export class ChangePasswordComponent {
   private readonly auth = inject(AuthService);

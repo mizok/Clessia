@@ -1,4 +1,4 @@
-<section class="public-shell" [class.menu-open]="menuOpen()">
+<section class="public-shell" [class.public-shell--menu-open]="menuOpen()">
   <!-- Brand Panel (Left Side) -->
   <aside class="public-shell__brand">
     <div class="public-shell__brand-content">
@@ -51,7 +51,7 @@
     <!-- Mobile hamburger -->
     <button
       class="hamburger hamburger--squeeze public-shell__hamburger"
-      [class.is-active]="menuOpen()"
+      [class.hamburger--active]="menuOpen()"
       type="button"
       (click)="toggleMenu()"
     >
@@ -62,10 +62,10 @@
   </aside>
 
   <!-- Mobile sidebar overlay -->
-  <div class="public-shell__overlay" [class.is-open]="menuOpen()" (click)="toggleMenu()"></div>
+  <div class="public-shell__overlay" [class.public-shell__overlay--open]="menuOpen()" (click)="toggleMenu()"></div>
 
   <!-- Mobile sidebar -->
-  <nav class="public-shell__sidebar" [class.is-open]="menuOpen()">
+  <nav class="public-shell__sidebar" [class.public-shell__sidebar--open]="menuOpen()">
     <div class="public-shell__sidebar-header">
       <a class="public-shell__logo" routerLink="/login" (click)="toggleMenu()">
         <span class="public-shell__logo-icon">C</span>
@@ -117,7 +117,7 @@
 
   <!-- Content Panel (Right Side) -->
   <main class="public-shell__main">
-    <div [@fadeAnimation]="getRouteAnimationData()" class="shell-route-wrapper">
+    <div [@fadeAnimation]="getRouteAnimationData()" class="shell-route-wrapper u-fill-route-child">
       <router-outlet />
     </div>
   </main>

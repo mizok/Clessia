@@ -9,6 +9,7 @@ import { SupabaseService } from '../../../../core/supabase.service';
   imports: [FormsModule, RouterLink],
   templateUrl: './reset-password.component.html',
   styleUrl: './reset-password.component.scss',
+  host: { class: 'centered-flex' },
 })
 export class ResetPasswordComponent implements OnInit, OnDestroy {
   newPassword = '';

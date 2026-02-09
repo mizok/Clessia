@@ -1,12 +1,14 @@
 import { Component, inject } from '@angular/core';
 import { RouterOutlet, ChildrenOutletContexts } from '@angular/router';
-import { ShellLayoutComponent, type NavItem } from '../../shared/components/layout/shell-layout/shell-layout.component';
+import { ShellLayoutComponent } from '../../shared/components/layout/shell-layout/shell-layout.component';
+import { SidebarComponent, type NavItem } from '../../shared/components/sidebar/sidebar.component';
+import { BottomBarComponent } from '../../shared/components/bottom-bar/bottom-bar.component';
 import { fadeAnimation } from '../../shared/animations';
 
 @Component({
   selector: 'app-admin-shell',
   standalone: true,
-  imports: [RouterOutlet, ShellLayoutComponent],
+  imports: [RouterOutlet, ShellLayoutComponent, SidebarComponent, BottomBarComponent],
   templateUrl: './admin-shell.component.html',
   styleUrl: './admin-shell.component.scss',
   animations: [fadeAnimation],

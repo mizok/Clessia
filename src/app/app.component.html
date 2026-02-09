@@ -1,5 +1,7 @@
-<router-outlet />
+<div class="app">
+  <router-outlet />
 
-@if (auth.showRolePicker()) {
-  <app-select-role />
-}
+  @if (auth.showRolePicker()) {
+    <app-select-role />
+  }
+</div>
