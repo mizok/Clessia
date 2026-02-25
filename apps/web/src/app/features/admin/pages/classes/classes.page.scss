@@ -1123,11 +1123,6 @@
 
   @include bp.respond-to('mobile') {
     gap: var(--space-2);
-
-    // Override PrimeNG's default dialog content padding for better mobile view
-    :host ::ng-deep .p-dialog-content {
-      padding: var(--space-3) !important;
-    }
   }
 
   .session-list-hint {
@@ -1236,5 +1231,15 @@
 
   .flex-grow-1 {
     flex-grow: 1;
+  }
+}
+
+// Global override for session list dialog padding on mobile
+// PrimeNG dialogs are often teleported to body, so we need a global selector
+::ng-deep .session-list-dialog-container {
+  @include bp.respond-to('mobile') {
+    .p-dialog-content {
+      padding: var(--space-3) !important;
+    }
   }
 }
