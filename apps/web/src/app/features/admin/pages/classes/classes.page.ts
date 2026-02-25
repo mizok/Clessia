@@ -37,7 +37,7 @@ import { CoursesService, Course, CreateCourseInput, UpdateCourseInput } from '@c
 import { CampusesService, Campus } from '@core/campuses.service';
 import { SubjectsService, Subject } from '@core/subjects.service';
 import { StaffService, Staff } from '@core/staff.service';
-import { SessionsService, Session } from '@core/sessions.service';
+import { SessionsService, Session, SessionQueryParams } from '@core/sessions.service';
 import { addMonths, format } from 'date-fns';
 
 // Shared
@@ -299,6 +299,11 @@ export class ClassesPage implements OnInit {
   protected readonly sessionListLoading = signal(false);
   protected readonly sessionListTargetClass = signal<Class | null>(null);
   protected readonly classSessions = signal<Session[]>([]);
+  protected readonly includePastSessions = signal(false);
+  protected readonly sessionPage = signal(1);
+  protected readonly hasMoreSessions = signal(true);
+  protected readonly SESSION_PAGE_SIZE = 20;
+
   protected readonly batchAssignSubjectId = computed(() => {
     const cls = this.batchAssignTargetClass();
     if (!cls) return '';
@@ -1183,15 +1188,48 @@ export class ClassesPage implements OnInit {
   protected openSessionListDialog(cls: Class): void {
     this.sessionListTargetClass.set(cls);
     this.classSessions.set([]);
+    this.sessionPage.set(1);
+    this.hasMoreSessions.set(true);
+    // Reset toggle to false (default only future) or keep current state?
+    // Let's keep current user preference for the toggle
     this.sessionListVisible.set(true);
-    this.loadClassSessions(cls.id);
+    this.loadClassSessions(cls.id, true);
   }
 
-  protected loadClassSessions(classId: string): void {
+  protected togglePastSessions(classId: string): void {
+    this.classSessions.set([]);
+    this.sessionPage.set(1);
+    this.hasMoreSessions.set(true);
+    this.loadClassSessions(classId, true);
+  }
+
+  protected loadMoreSessions(classId: string): void {
+    if (!this.hasMoreSessions() || this.sessionListLoading()) return;
+    this.sessionPage.update((p) => p + 1);
+    this.loadClassSessions(classId, false);
+  }
+
+  protected loadClassSessions(classId: string, isInitial: boolean): void {
     this.sessionListLoading.set(true);
-    this.sessionsService.list({ classId }).subscribe({
+    const params: SessionQueryParams = {
+      classId,
+      page: this.sessionPage(),
+      pageSize: this.SESSION_PAGE_SIZE,
+    };
+
+    if (!this.includePastSessions()) {
+      params.from = format(new Date(), 'yyyy-MM-dd');
+    }
+
+    this.sessionsService.list(params).subscribe({
       next: (res) => {
-        this.classSessions.set(res.data);
+        if (isInitial) {
+          this.classSessions.set(res.data);
+        } else {
+          this.classSessions.update((prev) => [...prev, ...res.data]);
+        }
+
+        this.hasMoreSessions.set(res.data.length === this.SESSION_PAGE_SIZE);
         this.sessionListLoading.set(false);
       },
       error: () => {

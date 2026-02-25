@@ -39,6 +39,8 @@ const SessionListQuerySchema = z
     courseId: z.uuid().optional().openapi({ description: '課程 ID' }),
     teacherId: z.uuid().optional().openapi({ description: '教師 ID' }),
     classId: z.uuid().optional().openapi({ description: '班級 ID' }),
+    page: z.coerce.number().optional().openapi({ description: '頁碼' }),
+    pageSize: z.coerce.number().optional().openapi({ description: '每頁筆數' }),
   })
   .openapi('SessionListQuery');
 
@@ -248,7 +250,7 @@ const listSessionsRoute = createRoute({
 app.openapi(listSessionsRoute, async (c) => {
   const supabase = c.get('supabase');
   const orgId = c.get('orgId');
-  const { from, to, campusId, courseId, teacherId, classId } = c.req.valid('query');
+  const { from, to, campusId, courseId, teacherId, classId, page, pageSize } = c.req.valid('query');
 
   let dbQuery = supabase
     .from('sessions')
@@ -286,6 +288,15 @@ app.openapi(listSessionsRoute, async (c) => {
   }
   if (classId) {
     dbQuery = dbQuery.eq('class_id', classId);
+  }
+
+  // Pagination
+  if (page && pageSize) {
+    const fromOffset = (page - 1) * pageSize;
+    const toOffset = fromOffset + pageSize - 1;
+    dbQuery = dbQuery.range(fromOffset, toOffset);
+  } else if (pageSize) {
+    dbQuery = dbQuery.limit(pageSize);
   }
 
   const { data, error } = await dbQuery;

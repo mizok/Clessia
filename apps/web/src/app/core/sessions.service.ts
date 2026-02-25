@@ -41,6 +41,8 @@ export interface SessionQueryParams {
   courseId?: string;
   teacherId?: string;
   classId?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -57,6 +59,8 @@ export class SessionsService {
     if (params.courseId) query['courseId'] = params.courseId;
     if (params.teacherId) query['teacherId'] = params.teacherId;
     if (params.classId) query['classId'] = params.classId;
+    if (params.page) query['page'] = params.page.toString();
+    if (params.pageSize) query['pageSize'] = params.pageSize.toString();
 
     return this.http.get<{ data: Session[] }>(this.endpoint, { params: query });
   }

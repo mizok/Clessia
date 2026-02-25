@@ -1127,6 +1127,14 @@
     margin: 0;
   }
 
+  .session-list-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--zinc-50);
+  }
+
   .session-table-wrapper {
     max-height: 400px;
     overflow-y: auto;
@@ -1164,6 +1172,13 @@
     tr:hover {
       background: var(--zinc-50) / 0.5;
     }
+  }
+
+  .session-table-footer {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-4);
+    border-top: 1px solid var(--zinc-50);
   }
 
   .text-secondary {
