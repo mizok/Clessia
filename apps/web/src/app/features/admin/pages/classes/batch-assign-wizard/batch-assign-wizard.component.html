@@ -1,15 +1,41 @@
-<p-stepper [value]="activeStep()" [linear]="true" styleClass="batch-wizard__stepper">
-  <p-step-list>
-    <p-step [value]="0">選擇老師</p-step>
-    <p-step [value]="1">選擇範圍</p-step>
-    <p-step [value]="2">進階設定</p-step>
-    <p-step [value]="3">預覽確認</p-step>
-  </p-step-list>
-  <p-step-panels>
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- Step 1: 選擇老師                                                -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <p-step-panel [value]="0">
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 步驟進度條（Steps Only — 不用 p-step-panels）                   -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="batch-wizard">
+  <div class="batch-wizard__progress">
+    @for (step of stepLabels; track step.value; let i = $index) {
+      <button
+        class="batch-wizard__progress-step"
+        [class.batch-wizard__progress-step--active]="activeStep() === step.value"
+        [class.batch-wizard__progress-step--done]="activeStep() > step.value"
+        [disabled]="step.value > activeStep()"
+        (click)="activeStep.set(step.value)"
+        type="button"
+      >
+        <span class="batch-wizard__progress-circle">
+          @if (activeStep() > step.value) {
+            <i class="pi pi-check"></i>
+          } @else {
+            {{ step.value + 1 }}
+          }
+        </span>
+        <span class="batch-wizard__progress-label">{{ step.label }}</span>
+      </button>
+      @if (i < stepLabels.length - 1) {
+        <div
+          class="batch-wizard__progress-line"
+          [class.batch-wizard__progress-line--done]="activeStep() > step.value"
+        ></div>
+      }
+    }
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- Step Content（用 @switch 自控渲染，不受 PrimeNG template 限制） -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  @switch (activeStep()) {
+    <!-- ─── Step 1: 選擇老師 ─────────────────────────────────────── -->
+    @case (0) {
       <div class="batch-wizard__step">
         <div class="batch-wizard__step-header">
           <i class="pi pi-user batch-wizard__step-icon"></i>
@@ -51,12 +77,10 @@
           />
         </div>
       </div>
-    </p-step-panel>
+    }
 
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- Step 2: 選擇範圍                                                -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <p-step-panel [value]="1">
+    <!-- ─── Step 2: 選擇範圍 ─────────────────────────────────────── -->
+    @case (1) {
       <div class="batch-wizard__step">
         <div class="batch-wizard__step-header">
           <i class="pi pi-calendar batch-wizard__step-icon"></i>
@@ -131,12 +155,10 @@
           />
         </div>
       </div>
-    </p-step-panel>
+    }
 
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- Step 3: 進階設定                                                -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <p-step-panel [value]="2">
+    <!-- ─── Step 3: 進階設定 ─────────────────────────────────────── -->
+    @case (2) {
       <div class="batch-wizard__step">
         <div class="batch-wizard__step-header">
           <i class="pi pi-cog batch-wizard__step-icon"></i>
@@ -232,12 +254,10 @@
           />
         </div>
       </div>
-    </p-step-panel>
+    }
 
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- Step 4: 預覽確認                                                -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <p-step-panel [value]="3">
+    <!-- ─── Step 4: 預覽確認 ─────────────────────────────────────── -->
+    @case (3) {
       <div class="batch-wizard__step">
         <div class="batch-wizard__step-header">
           <i class="pi pi-eye batch-wizard__step-icon"></i>
@@ -266,7 +286,6 @@
             </div>
           </div>
 
-          <!-- Strict 模式警告 -->
           @if (conflictMode() === 'strict' && preview.conflicts.length > 0) {
             <p-message severity="warn" styleClass="w-full">
               <span>
@@ -276,7 +295,6 @@
             </p-message>
           }
 
-          <!-- 衝突明細 -->
           @if (preview.conflicts.length > 0) {
             <div class="batch-wizard__conflicts">
               <div class="batch-wizard__conflicts-title">
@@ -316,6 +334,6 @@
           />
         </div>
       </div>
-    </p-step-panel>
-  </p-step-panels>
-</p-stepper>
+    }
+  }
+</div>

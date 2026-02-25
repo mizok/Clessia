@@ -7,7 +7,7 @@ import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { MultiSelectModule } from 'primeng/multiselect';
-import { StepperModule } from 'primeng/stepper';
+
 import { MessageModule } from 'primeng/message';
 import { TooltipModule } from 'primeng/tooltip';
 import { MessageService } from 'primeng/api';
@@ -40,7 +40,6 @@ interface WeekdayOption {
     DatePickerModule,
     ToggleSwitchModule,
     MultiSelectModule,
-    StepperModule,
     MessageModule,
     TooltipModule,
   ],
@@ -64,6 +63,13 @@ export class BatchAssignWizardComponent {
   // ── Wizard State ──────────────────────────────────────────────────────
   protected readonly activeStep = signal(0);
   protected readonly loading = signal(false);
+
+  protected readonly stepLabels = [
+    { value: 0, label: '選擇老師' },
+    { value: 1, label: '選擇範圍' },
+    { value: 2, label: '進階設定' },
+    { value: 3, label: '預覽確認' },
+  ];
 
   // Step 1: 選擇老師
   protected readonly selectedTeacherId = signal<string | null>(null);
