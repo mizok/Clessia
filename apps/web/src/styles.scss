@@ -1,3 +1,5 @@
+@use 'app/shared/breakpoints' as bp;
+
 /* =============================================================================
    Clessia Design Tokens
    ============================================================================= */
@@ -358,6 +360,17 @@ select {
 
     &:focus {
       box-shadow: 0 0 0 2px #0ea5e9;
+    }
+  }
+
+  // Mobile responsiveness for Toast
+  @include bp.respond-to('mobile') {
+    width: calc(100vw - 32px) !important;
+    left: 16px !important;
+    right: 16px !important;
+
+    .p-toast-message {
+      width: 100% !important;
     }
   }
 }
