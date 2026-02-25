@@ -877,17 +877,12 @@ app.openapi(
     const userId = c.get('userId');
     const { id } = c.req.valid('param');
 
-    const { count } = await supabase
-      .from('sessions')
-      .select('id', { count: 'exact', head: true })
-      .eq('class_id', id);
-
-    if (count && count > 0) {
-      return c.json(
-        { error: `此班級已有 ${count} 筆課堂記錄，無法刪除`, code: 'HAS_SESSIONS' },
-        409,
-      );
-    }
+    // CASCADE DELETE: 刪除關聯資料
+    // 注意：這裡我們手動刪除，以防資料庫層級沒有設 ON DELETE CASCADE
+    // 順序：sessions -> schedules -> enrollments -> class
+    await supabase.from('sessions').delete().eq('class_id', id);
+    await supabase.from('schedules').delete().eq('class_id', id);
+    await supabase.from('enrollments').delete().eq('class_id', id);
 
     const { data: existing } = await supabase.from('classes').select('name').eq('id', id).single();
 

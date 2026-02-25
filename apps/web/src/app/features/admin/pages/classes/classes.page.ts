@@ -1007,11 +1007,16 @@ export class ClassesPage implements OnInit {
   }
 
   protected confirmDeleteClass(cls: Class): void {
+    const hasSessions = cls.hasUpcomingSessions || (cls.scheduleCount ?? 0) > 0;
+    const message = hasSessions
+      ? `警告：班級「${cls.name}」已有課堂或時段設定。刪除班級將會一併刪除所有相關課堂、出席紀錄與報名資料。此操作無法復原，您確定要繼續嗎？`
+      : `確定要刪除班級「${cls.name}」嗎？此操作無法復原。`;
+
     this.confirmationService.confirm({
-      message: `確定要刪除班級「${cls.name}」嗎？此操作無法復原。`,
-      header: '確認刪除',
+      message,
+      header: '確認刪除' + (hasSessions ? ' (連集刪除警示)' : ''),
       icon: 'pi pi-exclamation-triangle',
-      acceptLabel: '刪除',
+      acceptLabel: hasSessions ? '仍要連集刪除' : '刪除',
       rejectLabel: '取消',
       acceptButtonStyleClass: 'p-button-danger',
       accept: () => {
@@ -1022,7 +1027,7 @@ export class ClassesPage implements OnInit {
             this.messageService.add({
               severity: 'success',
               summary: '刪除成功',
-              detail: `「${cls.name}」已刪除`,
+              detail: `「${cls.name}」及其關聯資料已刪除`,
             });
           },
           error: (err) => {
@@ -1296,10 +1301,12 @@ export class ClassesPage implements OnInit {
       next: (res) => {
         this.generateLoading.set(false);
         this.generateDialogVisible.set(false);
+        const created = res.createdAssigned + res.createdUnassigned;
+        const skipped = res.skippedExisting + res.skippedNoTeacher;
         this.messageService.add({
           severity: 'success',
           summary: '課堂產生完成',
-          detail: `已建立 ${res.created} 筆，略過 ${res.skipped} 筆（已存在）`,
+          detail: `已建立 ${created} 筆（含 ${res.createdUnassigned} 筆待指派），略過 ${skipped} 筆`,
         });
       },
       error: (err) => {

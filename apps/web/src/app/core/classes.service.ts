@@ -144,6 +144,14 @@ export interface BatchAssignTeacherResult {
   dryRun: boolean;
 }
 
+export interface GenerateSessionsResult {
+  createdAssigned: number;
+  createdUnassigned: number;
+  skippedExisting: number;
+  skippedNoTeacher: number;
+  totalPlanned: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ClassesService {
   private readonly http = inject(HttpClient);
@@ -218,8 +226,8 @@ export class ClassesService {
     from: string,
     to: string,
     excludeDates?: string[]
-  ): Observable<{ created: number; skipped: number }> {
-    return this.http.post<{ created: number; skipped: number }>(
+  ): Observable<GenerateSessionsResult> {
+    return this.http.post<GenerateSessionsResult>(
       `${this.endpoint}/${classId}/sessions/generate`,
       { from, to, ...(excludeDates && excludeDates.length > 0 ? { excludeDates } : {}) }
     );

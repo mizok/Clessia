@@ -470,7 +470,7 @@
   [closable]="!courseDialogLoading()"
   [style]="{ width: '32rem' }"
   styleClass="form-dialog-container"
-  [contentStyle]="{ 'max-height': 'calc(100dvh - 12rem)', 'overflow-y': 'auto' }"
+  [contentStyle]="{ 'max-height': 'calc(100dvh - 14rem)', 'overflow-y': 'auto' }"
 >
   <div class="form-dialog">
     <!-- Campus (create only) -->
@@ -590,7 +590,7 @@
   [closable]="!classDialogLoading()"
   [style]="{ width: '44rem' }"
   styleClass="form-dialog-container"
-  [contentStyle]="{ 'max-height': 'calc(100dvh - 12rem)', 'overflow-y': 'auto' }"
+  [contentStyle]="{ 'max-height': 'calc(100dvh - 14rem)', 'overflow-y': 'auto' }"
 >
   <div class="form-dialog">
     <!-- Name -->
@@ -775,7 +775,7 @@
   [closable]="!generateLoading()"
   [style]="{ width: '40rem' }"
   styleClass="form-dialog-container"
-  [contentStyle]="{ 'max-height': 'calc(100dvh - 12rem)', 'overflow-y': 'auto' }"
+  [contentStyle]="{ 'max-height': 'calc(100dvh - 14rem)', 'overflow-y': 'auto' }"
   (onHide)="generateStep.set('input')"
 >
   @if (generateStep() === 'input') {
@@ -940,7 +940,7 @@
   [closable]="true"
   [style]="{ width: '36rem' }"
   styleClass="form-dialog-container"
-  [contentStyle]="{ 'max-height': 'calc(100dvh - 12rem)', 'overflow-y': 'auto' }"
+  [contentStyle]="{ 'max-height': 'calc(100dvh - 14rem)', 'overflow-y': 'auto' }"
 >
   <div class="form-dialog">
     <div class="conflict-dialog__header">
@@ -1000,7 +1000,7 @@
   [closable]="!deactivateLoading()"
   [style]="{ width: '28rem' }"
   styleClass="form-dialog-container"
-  [contentStyle]="{ 'max-height': 'calc(100dvh - 12rem)', 'overflow-y': 'auto' }"
+  [contentStyle]="{ 'max-height': 'calc(100dvh - 18rem)', 'overflow-y': 'auto' }"
 >
   @if (deactivateTargetClass()) {
     <div class="form-dialog">
@@ -1060,6 +1060,8 @@
   [closable]="true"
   [style]="{ width: '40rem' }"
   [breakpoints]="{ '640px': '95vw' }"
+  styleClass="form-dialog-container"
+  [contentStyle]="{ 'max-height': 'calc(100dvh - 14rem)', 'overflow-y': 'auto' }"
   (onHide)="onBatchAssignCancelled()"
 >
   @if (batchAssignTargetClass()) {
