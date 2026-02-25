@@ -290,6 +290,12 @@ export class ClassesPage implements OnInit {
   // ---- Batch Assign Wizard Dialog ----
   protected readonly batchAssignDialogVisible = signal(false);
   protected readonly batchAssignTargetClass = signal<Class | null>(null);
+  protected readonly batchAssignSubjectId = computed(() => {
+    const cls = this.batchAssignTargetClass();
+    if (!cls) return '';
+    const course = this.courses().find((c) => c.id === cls.courseId);
+    return course?.subjectId ?? '';
+  });
 
   // ---- Static options ----
   protected readonly gradeOptions = [

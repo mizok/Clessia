@@ -1054,6 +1054,8 @@
       [classId]="batchAssignTargetClass()!.id"
       [className]="batchAssignTargetClass()!.name"
       [teachers]="staff()"
+      [campusId]="batchAssignTargetClass()!.campusId"
+      [subjectId]="batchAssignSubjectId()"
       (completed)="onBatchAssignCompleted()"
       (cancelled)="onBatchAssignCancelled()"
     />

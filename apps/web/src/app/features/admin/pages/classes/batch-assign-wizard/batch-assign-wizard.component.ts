@@ -51,6 +51,8 @@ export class BatchAssignWizardComponent {
   readonly classId = input.required<string>();
   readonly className = input.required<string>();
   readonly teachers = input.required<Staff[]>();
+  readonly campusId = input.required<string>();
+  readonly subjectId = input.required<string>();
 
   // ── Outputs ───────────────────────────────────────────────────────────
   readonly completed = output<void>();
@@ -88,11 +90,19 @@ export class BatchAssignWizardComponent {
   protected readonly previewResult = signal<BatchAssignTeacherResult | null>(null);
 
   // ── Options ───────────────────────────────────────────────────────────
-  protected readonly teacherOptions = computed(() =>
-    this.teachers()
-      .filter((s) => s.roles.includes('teacher') && s.isActive)
-      .map((s) => ({ label: s.displayName, value: s.id })),
-  );
+  protected readonly teacherOptions = computed(() => {
+    const campus = this.campusId();
+    const subject = this.subjectId();
+    return this.teachers()
+      .filter(
+        (s) =>
+          s.roles.includes('teacher') &&
+          s.isActive &&
+          s.campusIds.includes(campus) &&
+          s.subjectIds.includes(subject),
+      )
+      .map((s) => ({ label: s.displayName, value: s.id }));
+  });
 
   protected readonly weekdayOptions: WeekdayOption[] = [
     { label: '一', value: 1 },
