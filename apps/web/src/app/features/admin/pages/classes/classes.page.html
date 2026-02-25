@@ -372,6 +372,14 @@
                               (onClick)="openGenerateDialog(cls)"
                             />
                             <p-button
+                              label="批次指派老師"
+                              icon="pi pi-users"
+                              size="small"
+                              [outlined]="true"
+                              severity="info"
+                              (onClick)="openBatchAssignWizard(cls)"
+                            />
+                            <p-button
                               [label]="cls.isActive ? '停用' : '啟用'"
                               [icon]="cls.isActive ? 'pi pi-ban' : 'pi pi-check-circle'"
                               size="small"
@@ -1028,3 +1036,26 @@
   [resourceTypes]="['class', 'course']"
   title="課程管理操作紀錄"
 />
+
+<!-- ============================================================ -->
+<!-- Batch Assign Wizard Dialog -->
+<!-- ============================================================ -->
+<p-dialog
+  header="批次指派老師"
+  [(visible)]="batchAssignDialogVisible"
+  [modal]="true"
+  [closable]="true"
+  [style]="{ width: '40rem' }"
+  [breakpoints]="{ '640px': '95vw' }"
+  (onHide)="onBatchAssignCancelled()"
+>
+  @if (batchAssignTargetClass()) {
+    <app-batch-assign-wizard
+      [classId]="batchAssignTargetClass()!.id"
+      [className]="batchAssignTargetClass()!.name"
+      [teachers]="staff()"
+      (completed)="onBatchAssignCompleted()"
+      (cancelled)="onBatchAssignCancelled()"
+    />
+  }
+</p-dialog>

@@ -110,6 +110,40 @@ export interface ScheduleConflict {
   conflictingEndTime: string;
 }
 
+export interface BatchAssignTimeRangeInput {
+  startTime: string;
+  endTime: string;
+}
+
+export type BatchAssignMode = 'skip-conflicts' | 'strict' | 'force';
+
+export interface BatchAssignTeacherInput {
+  from: string;
+  to: string;
+  toTeacherId: string;
+  weekday?: number[];
+  timeRanges?: BatchAssignTimeRangeInput[];
+  mode?: BatchAssignMode;
+  includeAssigned?: boolean;
+  dryRun?: boolean;
+}
+
+export interface BatchAssignConflict {
+  sessionId: string;
+  sessionDate: string;
+  startTime: string;
+  endTime: string;
+  conflictWithSessionId: string;
+}
+
+export interface BatchAssignTeacherResult {
+  updated: number;
+  skippedConflicts: number;
+  skippedNotEligible: number;
+  conflicts: BatchAssignConflict[];
+  dryRun: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ClassesService {
   private readonly http = inject(HttpClient);
@@ -198,6 +232,16 @@ export class ClassesService {
     return this.http.post<{ conflicts: ScheduleConflict[] }>(
       `${this.endpoint}/check-conflicts`,
       { schedules, ...(excludeClassId ? { excludeClassId } : {}) }
+    );
+  }
+
+  batchAssignTeacher(
+    classId: string,
+    input: BatchAssignTeacherInput,
+  ): Observable<BatchAssignTeacherResult> {
+    return this.http.patch<BatchAssignTeacherResult>(
+      `${this.endpoint}/${classId}/sessions/batch-assign-teacher`,
+      input,
     );
   }
 

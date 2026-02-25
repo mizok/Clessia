@@ -1,0 +1,256 @@
+// ── Batch Assign Wizard Component ─────────────────────────────────────
+// BEM: .batch-wizard
+
+.batch-wizard {
+  // ── Stepper overrides ─────────────────────────────────────────────────
+  &__stepper {
+    // 手機版 step label 隱藏文字、只顯示圓點
+    @media (max-width: 600px) {
+      :host ::ng-deep .p-stepper-title {
+        display: none;
+      }
+    }
+  }
+
+  // ── Step Content ──────────────────────────────────────────────────────
+  &__step {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4, 16px);
+    padding: var(--space-4, 16px) 0;
+  }
+
+  &__step-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3, 12px);
+    margin-bottom: var(--space-2, 8px);
+  }
+
+  &__step-icon {
+    font-size: 1.5rem;
+    color: var(--p-primary-color);
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+
+  &__step-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 var(--space-1, 4px);
+    color: var(--text-primary, var(--p-text-color));
+  }
+
+  &__step-desc {
+    font-size: 0.875rem;
+    color: var(--text-secondary, var(--p-text-muted-color));
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  // ── Fields ────────────────────────────────────────────────────────────
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2, 8px);
+  }
+
+  &__label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary, var(--p-text-color));
+  }
+
+  &__required {
+    color: var(--p-red-500, #ef4444);
+  }
+
+  // ── Row Layout ────────────────────────────────────────────────────────
+  &__row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4, 16px);
+
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  // ── Toggle ────────────────────────────────────────────────────────────
+  &__toggle-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, 8px);
+
+    label {
+      font-size: 0.875rem;
+      color: var(--text-secondary, var(--p-text-muted-color));
+      cursor: pointer;
+    }
+  }
+
+  &__warning-text {
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+
+  // ── Section Header (label + add button) ───────────────────────────────
+  &__section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  // ── Time Range ────────────────────────────────────────────────────────
+  &__time-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, 8px);
+
+    @media (max-width: 600px) {
+      flex-wrap: wrap;
+    }
+  }
+
+  &__time-input {
+    flex: 1;
+    min-width: 100px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--p-surface-300);
+    border-radius: var(--p-border-radius);
+    font-size: 0.875rem;
+    background: var(--p-surface-0);
+    color: var(--p-text-color);
+    outline: none;
+    transition: border-color 0.2s;
+
+    &:focus {
+      border-color: var(--p-primary-color);
+    }
+  }
+
+  &__dash {
+    color: var(--text-secondary, var(--p-text-muted-color));
+    flex-shrink: 0;
+  }
+
+  &__empty-note {
+    font-size: 0.85rem;
+    color: var(--text-secondary, var(--p-text-muted-color));
+    font-style: italic;
+    margin: 0;
+  }
+
+  // ── Preview Summary ───────────────────────────────────────────────────
+  &__summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-3, 12px);
+
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__summary-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--space-4, 16px);
+    border-radius: var(--p-border-radius);
+    background: var(--p-surface-100);
+    gap: var(--space-1, 4px);
+
+    &--ok {
+      background: var(--p-green-50, #f0fdf4);
+      border: 1px solid var(--p-green-200, #bbf7d0);
+    }
+
+    &--warn {
+      background: var(--p-orange-50, #fff7ed);
+      border: 1px solid var(--p-orange-200, #fed7aa);
+    }
+  }
+
+  &__summary-number {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text-primary, var(--p-text-color));
+  }
+
+  &__summary-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary, var(--p-text-muted-color));
+  }
+
+  // ── Conflicts ─────────────────────────────────────────────────────────
+  &__conflicts {
+    border: 1px solid var(--p-orange-200, #fed7aa);
+    border-radius: var(--p-border-radius);
+    overflow: hidden;
+  }
+
+  &__conflicts-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, 8px);
+    padding: var(--space-2, 8px) var(--space-3, 12px);
+    background: var(--p-orange-50, #fff7ed);
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: var(--p-orange-700, #c2410c);
+
+    i {
+      color: var(--p-orange-500, #f97316);
+    }
+  }
+
+  &__conflict-list {
+    max-height: 180px;
+    overflow-y: auto;
+    padding: var(--space-2, 8px) var(--space-3, 12px);
+  }
+
+  &__conflict-item {
+    padding: var(--space-1, 4px) 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary, var(--p-text-muted-color));
+    border-bottom: 1px solid var(--p-surface-200);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__no-conflict {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, 8px);
+    padding: var(--space-3, 12px);
+    background: var(--p-green-50, #f0fdf4);
+    border-radius: var(--p-border-radius);
+    font-size: 0.875rem;
+    color: var(--p-green-700, #15803d);
+
+    i {
+      color: var(--p-green-500, #22c55e);
+      font-size: 1.1rem;
+    }
+  }
+
+  // ── Footer ────────────────────────────────────────────────────────────
+  &__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: var(--space-4, 16px);
+    border-top: 1px solid var(--p-surface-200);
+    margin-top: var(--space-2, 8px);
+
+    @media (max-width: 600px) {
+      // 底部按鈕更寬敞
+      padding-top: var(--space-3, 12px);
+    }
+  }
+}

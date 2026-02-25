@@ -41,6 +41,7 @@ import { StaffService, Staff } from '@core/staff.service';
 // Shared
 import { EmptyStateComponent } from '@shared/components/empty-state/empty-state.component';
 import { AuditLogDialogComponent } from '@shared/components/audit-log-dialog/audit-log-dialog.component';
+import { BatchAssignWizardComponent } from './batch-assign-wizard/batch-assign-wizard.component';
 import type { RouteObj } from '@core/smart-enums/routes-catalog';
 
 export interface ScheduleFormEntry {
@@ -82,6 +83,7 @@ interface CourseGroup {
     TabsModule,
     EmptyStateComponent,
     AuditLogDialogComponent,
+    BatchAssignWizardComponent,
   ],
   providers: [MessageService, ConfirmationService],
   templateUrl: './classes.page.html',
@@ -284,6 +286,10 @@ export class ClassesPage implements OnInit {
   protected readonly skippedSessionCount = computed(
     () => this.previewSessions().filter((s) => s.exists).length
   );
+
+  // ---- Batch Assign Wizard Dialog ----
+  protected readonly batchAssignDialogVisible = signal(false);
+  protected readonly batchAssignTargetClass = signal<Class | null>(null);
 
   // ---- Static options ----
   protected readonly gradeOptions = [
@@ -1216,6 +1222,27 @@ export class ClassesPage implements OnInit {
         });
       },
     });
+  }
+
+  // ================================================================
+  // Batch Assign Wizard
+  // ================================================================
+
+  protected openBatchAssignWizard(cls: Class): void {
+    this.batchAssignTargetClass.set(cls);
+    this.batchAssignDialogVisible.set(true);
+  }
+
+  protected onBatchAssignCompleted(): void {
+    this.batchAssignDialogVisible.set(false);
+    this.batchAssignTargetClass.set(null);
+    // Reload class data to reflect updated assignments
+    this.loadAll();
+  }
+
+  protected onBatchAssignCancelled(): void {
+    this.batchAssignDialogVisible.set(false);
+    this.batchAssignTargetClass.set(null);
   }
 
   // ================================================================
