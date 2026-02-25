@@ -1,6 +1,10 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import type { AppEnv } from '../index';
 import { logAudit } from '../utils/audit';
+import { planBatchAssign } from '../domain/session-assignment/batch-assign-planner';
+import { buildSessionGenerationPlan } from '../domain/session-assignment/session-generation-planner';
+import { deriveAssignmentStatus } from '../domain/session-assignment/session-assignment.rules';
+import type { BatchAssignMode } from '../domain/session-assignment/session-assignment.types';
 
 // ============================================================
 // Schemas
@@ -95,8 +99,43 @@ const SessionPreviewSchema = z
     teacherName: z.string().optional(),
     weekday: z.number(),
     exists: z.boolean(),
+    canCreate: z.boolean(),
+    willBeUnassigned: z.boolean(),
+    skipReason: z.enum(['exists', 'no_teacher']).nullable(),
   })
   .openapi('SessionPreview');
+
+const BatchAssignTimeRangeSchema = z.object({
+  startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+});
+
+const BatchAssignBodySchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  weekday: z.array(z.number().int().min(1).max(7)).optional(),
+  timeRanges: z.array(BatchAssignTimeRangeSchema).optional(),
+  toTeacherId: z.uuid(),
+  mode: z.enum(['skip-conflicts', 'strict', 'force']).default('skip-conflicts'),
+  includeAssigned: z.boolean().default(false),
+  dryRun: z.boolean().optional(),
+});
+
+const BatchAssignConflictSchema = z.object({
+  sessionId: z.uuid(),
+  sessionDate: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  conflictWithSessionId: z.uuid(),
+});
+
+const GenerateSessionsResponseSchema = z.object({
+  createdAssigned: z.number(),
+  createdUnassigned: z.number(),
+  skippedExisting: z.number(),
+  skippedNoTeacher: z.number(),
+  totalPlanned: z.number(),
+});
 
 const ErrorSchema = z
   .object({
@@ -115,7 +154,7 @@ const CheckConflictsRequestSchema = z
         teacherId: z.uuid().nullable(),
         effectiveFrom: z.string(),
         effectiveTo: z.string().nullable().optional(),
-      })
+      }),
     ),
     excludeClassId: z.uuid().optional(),
   })
@@ -190,6 +229,25 @@ function mapClass(row: Record<string, unknown>, extras?: ClassExtras) {
     updatedBy: (row['updated_by'] as string | null) ?? null,
     updatedByName: extras?.updatedByName ?? null,
   };
+}
+
+function normalizeTime(value: string): string {
+  const [h = '00', m = '00', s = '00'] = value.split(':');
+  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}:${s.padStart(2, '0')}`;
+}
+
+function toWeekday(dateString: string): number {
+  const day = new Date(`${dateString}T00:00:00Z`).getUTCDay();
+  return day === 0 ? 7 : day;
+}
+
+function toMinutes(value: string): number {
+  const [h = '0', m = '0'] = normalizeTime(value).split(':');
+  return Number(h) * 60 + Number(m);
+}
+
+function isTimeOverlap(startA: string, endA: string, startB: string, endB: string): boolean {
+  return toMinutes(startA) < toMinutes(endB) && toMinutes(startB) < toMinutes(endA);
 }
 
 // ============================================================
@@ -283,7 +341,7 @@ app.openapi(
         totalPages: Math.ceil((count || 0) / pageSize),
       },
     });
-  }
+  },
 );
 
 // POST /api/classes/check-conflicts
@@ -321,10 +379,7 @@ app.openapi(
     const teacherIds = [...new Set(schedulesToCheck.map((s) => s.teacherId as string))];
 
     // Step 1: 取得此 org 的所有班級 id（確保跨組織隔離）
-    const { data: orgClasses } = await supabase
-      .from('classes')
-      .select('id')
-      .eq('org_id', orgId);
+    const { data: orgClasses } = await supabase.from('classes').select('id').eq('org_id', orgId);
     let orgClassIds = (orgClasses || []).map((c) => c.id as string);
 
     if (excludeClassId) {
@@ -404,7 +459,7 @@ app.openapi(
     }
 
     return c.json({ conflicts }, 200);
-  }
+  },
 );
 
 // PATCH /api/classes/batch-set-active
@@ -445,16 +500,20 @@ app.openapi(
 
     if (error) return c.json({ updated: 0 }, 200);
 
-    logAudit(supabase, {
-      orgId,
-      userId,
-      resourceType: 'class',
-      action: isActive ? 'batch_activate' : 'batch_deactivate',
-      details: { count: ids.length },
-    }, c.executionCtx.waitUntil.bind(c.executionCtx));
+    logAudit(
+      supabase,
+      {
+        orgId,
+        userId,
+        resourceType: 'class',
+        action: isActive ? 'batch_activate' : 'batch_deactivate',
+        details: { count: ids.length },
+      },
+      c.executionCtx.waitUntil.bind(c.executionCtx),
+    );
 
     return c.json({ updated: data?.length ?? 0 }, 200);
-  }
+  },
 );
 
 // DELETE /api/classes/batch
@@ -510,16 +569,20 @@ app.openapi(
     const { error } = await supabase.from('classes').delete().in('id', toDeleteIds);
     if (error) return c.json({ deleted: 0, deletedIds: [], skipped }, 200);
 
-    logAudit(supabase, {
-      orgId,
-      userId,
-      resourceType: 'class',
-      action: 'batch_delete',
-      details: { count: toDeleteIds.length },
-    }, c.executionCtx.waitUntil.bind(c.executionCtx));
+    logAudit(
+      supabase,
+      {
+        orgId,
+        userId,
+        resourceType: 'class',
+        action: 'batch_delete',
+        details: { count: toDeleteIds.length },
+      },
+      c.executionCtx.waitUntil.bind(c.executionCtx),
+    );
 
     return c.json({ deleted: toDeleteIds.length, deletedIds: toDeleteIds, skipped }, 200);
-  }
+  },
 );
 
 // GET /api/classes/:id（含 schedules）
@@ -573,9 +636,9 @@ app.openapi(
           updatedByName,
         }),
       },
-      200
+      200,
     );
-  }
+  },
 );
 
 // POST /api/classes
@@ -642,17 +705,21 @@ app.openapi(
       return c.json({ error: error.message, code: 'DB_ERROR' }, 400);
     }
 
-    logAudit(supabase, {
-      orgId,
-      userId,
-      resourceType: 'class',
-      resourceId: data.id as string,
-      resourceName: data.name as string,
-      action: 'create',
-    }, c.executionCtx.waitUntil.bind(c.executionCtx));
+    logAudit(
+      supabase,
+      {
+        orgId,
+        userId,
+        resourceType: 'class',
+        resourceId: data.id as string,
+        resourceName: data.name as string,
+        action: 'create',
+      },
+      c.executionCtx.waitUntil.bind(c.executionCtx),
+    );
 
     return c.json({ data: mapClass(data as Record<string, unknown>, {}) }, 201);
-  }
+  },
 );
 
 // PUT /api/classes/:id
@@ -701,17 +768,21 @@ app.openapi(
       return c.json({ error: '班級不存在', code: 'NOT_FOUND' }, 404);
     }
 
-    logAudit(supabase, {
-      orgId: c.get('orgId'),
-      userId,
-      resourceType: 'class',
-      resourceId: id,
-      resourceName: data.name as string,
-      action: 'update',
-    }, c.executionCtx.waitUntil.bind(c.executionCtx));
+    logAudit(
+      supabase,
+      {
+        orgId: c.get('orgId'),
+        userId,
+        resourceType: 'class',
+        resourceId: id,
+        resourceName: data.name as string,
+        action: 'update',
+      },
+      c.executionCtx.waitUntil.bind(c.executionCtx),
+    );
 
     return c.json({ data: mapClass(data as Record<string, unknown>, {}) }, 200);
-  }
+  },
 );
 
 // PATCH /api/classes/:id/toggle-active
@@ -759,18 +830,22 @@ app.openapi(
       return c.json({ error: '更新失敗', code: 'UPDATE_FAILED' }, 404);
     }
 
-    logAudit(supabase, {
-      orgId: c.get('orgId'),
-      userId,
-      resourceType: 'class',
-      resourceId: id,
-      resourceName: data.name as string,
-      action: 'toggle_active',
-      details: { isActive: !current.is_active },
-    }, c.executionCtx.waitUntil.bind(c.executionCtx));
+    logAudit(
+      supabase,
+      {
+        orgId: c.get('orgId'),
+        userId,
+        resourceType: 'class',
+        resourceId: id,
+        resourceName: data.name as string,
+        action: 'toggle_active',
+        details: { isActive: !current.is_active },
+      },
+      c.executionCtx.waitUntil.bind(c.executionCtx),
+    );
 
     return c.json({ data: mapClass(data as Record<string, unknown>, {}) }, 200);
-  }
+  },
 );
 
 // DELETE /api/classes/:id
@@ -810,32 +885,32 @@ app.openapi(
     if (count && count > 0) {
       return c.json(
         { error: `此班級已有 ${count} 筆課堂記錄，無法刪除`, code: 'HAS_SESSIONS' },
-        409
+        409,
       );
     }
 
-    const { data: existing } = await supabase
-      .from('classes')
-      .select('name')
-      .eq('id', id)
-      .single();
+    const { data: existing } = await supabase.from('classes').select('name').eq('id', id).single();
 
     const { error } = await supabase.from('classes').delete().eq('id', id);
     if (error) {
       return c.json({ error: '班級不存在', code: 'NOT_FOUND' }, 404);
     }
 
-    logAudit(supabase, {
-      orgId,
-      userId,
-      resourceType: 'class',
-      resourceId: id,
-      resourceName: existing?.name ?? null,
-      action: 'delete',
-    }, c.executionCtx.waitUntil.bind(c.executionCtx));
+    logAudit(
+      supabase,
+      {
+        orgId,
+        userId,
+        resourceType: 'class',
+        resourceId: id,
+        resourceName: existing?.name ?? null,
+        action: 'delete',
+      },
+      c.executionCtx.waitUntil.bind(c.executionCtx),
+    );
 
     return c.json({ success: true }, 200);
-  }
+  },
 );
 
 // POST /api/classes/:id/schedules
@@ -894,18 +969,22 @@ app.openapi(
       return c.json({ error: error.message, code: 'DB_ERROR' }, 400);
     }
 
-    logAudit(supabase, {
-      orgId,
-      userId,
-      resourceType: 'class',
-      resourceId: id,
-      resourceName: cls?.name ?? null,
-      action: 'add_schedule',
-      details: { weekday: body.weekday, startTime: body.startTime, endTime: body.endTime },
-    }, c.executionCtx.waitUntil.bind(c.executionCtx));
+    logAudit(
+      supabase,
+      {
+        orgId,
+        userId,
+        resourceType: 'class',
+        resourceId: id,
+        resourceName: cls?.name ?? null,
+        action: 'add_schedule',
+        details: { weekday: body.weekday, startTime: body.startTime, endTime: body.endTime },
+      },
+      c.executionCtx.waitUntil.bind(c.executionCtx),
+    );
 
     return c.json({ data: mapSchedule(data as Record<string, unknown>) }, 201);
-  }
+  },
 );
 
 // PUT /api/classes/:id/schedules/:sid
@@ -956,7 +1035,7 @@ app.openapi(
     }
 
     return c.json({ data: mapSchedule(data as Record<string, unknown>) }, 200);
-  }
+  },
 );
 
 // DELETE /api/classes/:id/schedules/:sid
@@ -986,27 +1065,27 @@ app.openapi(
 
     const { data: cls } = await supabase.from('classes').select('name').eq('id', id).single();
 
-    const { error } = await supabase
-      .from('schedules')
-      .delete()
-      .eq('id', sid)
-      .eq('class_id', id);
+    const { error } = await supabase.from('schedules').delete().eq('id', sid).eq('class_id', id);
 
     if (error) {
       return c.json({ error: '時段不存在', code: 'NOT_FOUND' }, 404);
     }
 
-    logAudit(supabase, {
-      orgId,
-      userId,
-      resourceType: 'class',
-      resourceId: id,
-      resourceName: cls?.name ?? null,
-      action: 'delete_schedule',
-    }, c.executionCtx.waitUntil.bind(c.executionCtx));
+    logAudit(
+      supabase,
+      {
+        orgId,
+        userId,
+        resourceType: 'class',
+        resourceId: id,
+        resourceName: cls?.name ?? null,
+        action: 'delete_schedule',
+      },
+      c.executionCtx.waitUntil.bind(c.executionCtx),
+    );
 
     return c.json({ success: true }, 200);
-  }
+  },
 );
 
 // GET /api/classes/:id/sessions/preview
@@ -1018,7 +1097,12 @@ app.openapi(
     summary: '預覽將產生的課堂',
     request: {
       params: z.object({ id: z.uuid() }),
-      query: z.object({ from: z.string(), to: z.string(), excludeDates: z.string().optional() }),
+      query: z.object({
+        from: z.string(),
+        to: z.string(),
+        excludeDates: z.string().optional(),
+        includeUnassigned: z.string().optional(),
+      }),
     },
     responses: {
       200: {
@@ -1036,15 +1120,16 @@ app.openapi(
   async (c) => {
     const supabase = c.get('supabase');
     const { id } = c.req.valid('param');
-    const { from, to, excludeDates } = c.req.valid('query');
+    const { from, to, excludeDates, includeUnassigned } = c.req.valid('query');
 
     const fromDate = new Date(from);
     const toDate = new Date(to);
 
-    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime()) || fromDate > toDate) {
       return c.json({ error: '無效日期格式', code: 'INVALID_DATE' }, 400);
     }
 
+    const includeUnassignedValue = includeUnassigned !== 'false';
     const excludeSet = new Set(excludeDates ? excludeDates.split(',').filter(Boolean) : []);
 
     const { data: schedules } = await supabase
@@ -1065,62 +1150,33 @@ app.openapi(
 
     const existingSet = new Set(
       (existingSessions || []).map(
-        (s: { session_date: string; start_time: string }) => `${s.session_date}|${s.start_time}`
-      )
+        (s: { session_date: string; start_time: string }) =>
+          `${s.session_date}|${normalizeTime(s.start_time)}`,
+      ),
     );
 
-    const previews: Array<{
-      sessionDate: string;
-      startTime: string;
-      endTime: string;
-      teacherId: string | null;
-      teacherName?: string;
-      weekday: number;
-      exists: boolean;
-    }> = [];
+    const plan = buildSessionGenerationPlan({
+      orgId: c.get('orgId'),
+      classId: id,
+      from,
+      to,
+      includeUnassigned: includeUnassignedValue,
+      schedules: (schedules || []).map((schedule) => ({
+        id: schedule.id as string,
+        weekday: schedule.weekday as number,
+        startTime: schedule.start_time as string,
+        endTime: schedule.end_time as string,
+        teacherId: (schedule.teacher_id as string | null) ?? null,
+        teacherName: (schedule.staff as { display_name: string } | null)?.display_name,
+        effectiveFrom: schedule.effective_from as string,
+        effectiveTo: (schedule.effective_to as string | null) ?? null,
+      })),
+      existingKeys: existingSet,
+      excludeDates: excludeSet,
+    });
 
-    const cursor = new Date(fromDate);
-    while (cursor <= toDate) {
-      const isoDate = cursor.toISOString().split('T')[0];
-      // JS getDay(): 0=Sun, 1=Mon...6=Sat → 我們: 1=Mon...7=Sun
-      const jsDay = cursor.getDay();
-      const weekday = jsDay === 0 ? 7 : jsDay;
-
-      if (excludeSet.has(isoDate)) {
-        cursor.setDate(cursor.getDate() + 1);
-        continue;
-      }
-
-      for (const schedule of schedules) {
-        if (schedule.weekday !== weekday) continue;
-
-        const effFrom = new Date(schedule.effective_from);
-        const effTo = schedule.effective_to ? new Date(schedule.effective_to) : null;
-
-        if (cursor < effFrom) continue;
-        if (effTo && cursor > effTo) continue;
-
-        previews.push({
-          sessionDate: isoDate,
-          startTime: schedule.start_time,
-          endTime: schedule.end_time,
-          teacherId: schedule.teacher_id,
-          teacherName: (schedule.staff as { display_name: string } | null)?.display_name,
-          weekday,
-          exists: existingSet.has(`${isoDate}|${schedule.start_time}`),
-        });
-      }
-
-      cursor.setDate(cursor.getDate() + 1);
-    }
-
-    previews.sort(
-      (a, b) =>
-        a.sessionDate.localeCompare(b.sessionDate) || a.startTime.localeCompare(b.startTime)
-    );
-
-    return c.json({ data: previews }, 200);
-  }
+    return c.json({ data: plan.preview }, 200);
+  },
 );
 
 // POST /api/classes/:id/sessions/generate
@@ -1139,6 +1195,7 @@ app.openapi(
               from: z.string(),
               to: z.string(),
               excludeDates: z.array(z.string()).optional(),
+              includeUnassigned: z.boolean().optional(),
             }),
           },
         },
@@ -1149,7 +1206,7 @@ app.openapi(
         description: '成功',
         content: {
           'application/json': {
-            schema: z.object({ created: z.number(), skipped: z.number() }),
+            schema: GenerateSessionsResponseSchema,
           },
         },
       },
@@ -1163,89 +1220,308 @@ app.openapi(
     const supabase = c.get('supabase');
     const orgId = c.get('orgId');
     const { id } = c.req.valid('param');
-    const { from, to, excludeDates } = c.req.valid('json');
+    const { from, to, excludeDates, includeUnassigned } = c.req.valid('json');
 
     const fromDate = new Date(from);
     const toDate = new Date(to);
 
-    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime()) || fromDate > toDate) {
       return c.json({ error: '無效日期格式', code: 'INVALID_DATE' }, 400);
     }
 
     const excludeSet = new Set(excludeDates ?? []);
+    const includeUnassignedValue = includeUnassigned ?? true;
 
     const { data: schedules } = await supabase.from('schedules').select('*').eq('class_id', id);
 
     if (!schedules || schedules.length === 0) {
-      return c.json({ created: 0, skipped: 0 }, 200);
+      return c.json(
+        {
+          createdAssigned: 0,
+          createdUnassigned: 0,
+          skippedExisting: 0,
+          skippedNoTeacher: 0,
+          totalPlanned: 0,
+        },
+        200,
+      );
     }
 
-    const toInsert: Array<{
-      org_id: string;
-      class_id: string;
-      schedule_id: string;
-      session_date: string;
-      start_time: string;
-      end_time: string;
-      teacher_id: string; // sessions require a teacher; schedules without teacher are skipped
-      status: string;
-    }> = [];
+    const { data: existingSessions } = await supabase
+      .from('sessions')
+      .select('session_date, start_time')
+      .eq('class_id', id)
+      .gte('session_date', from)
+      .lte('session_date', to);
 
-    const cursor = new Date(fromDate);
-    while (cursor <= toDate) {
-      const isoDate = cursor.toISOString().split('T')[0];
-      const jsDay = cursor.getDay();
-      const weekday = jsDay === 0 ? 7 : jsDay;
+    const existingSet = new Set(
+      (existingSessions || []).map(
+        (s: { session_date: string; start_time: string }) =>
+          `${s.session_date}|${normalizeTime(s.start_time)}`,
+      ),
+    );
 
-      if (excludeSet.has(isoDate)) {
-        cursor.setDate(cursor.getDate() + 1);
-        continue;
-      }
+    const plan = buildSessionGenerationPlan({
+      orgId,
+      classId: id,
+      from,
+      to,
+      includeUnassigned: includeUnassignedValue,
+      schedules: schedules.map((schedule) => ({
+        id: schedule.id as string,
+        weekday: schedule.weekday as number,
+        startTime: schedule.start_time as string,
+        endTime: schedule.end_time as string,
+        teacherId: (schedule.teacher_id as string | null) ?? null,
+        effectiveFrom: schedule.effective_from as string,
+        effectiveTo: (schedule.effective_to as string | null) ?? null,
+      })),
+      existingKeys: existingSet,
+      excludeDates: excludeSet,
+    });
 
-      for (const schedule of schedules) {
-        if (schedule.weekday !== weekday) continue;
-        if (!schedule.teacher_id) continue; // skip schedules without a teacher
-
-        const effFrom = new Date(schedule.effective_from);
-        const effTo = schedule.effective_to ? new Date(schedule.effective_to) : null;
-
-        if (cursor < effFrom) continue;
-        if (effTo && cursor > effTo) continue;
-
-        toInsert.push({
-          org_id: orgId,
-          class_id: id,
-          schedule_id: schedule.id,
-          session_date: isoDate,
-          start_time: schedule.start_time,
-          end_time: schedule.end_time,
-          teacher_id: schedule.teacher_id,
-          status: 'scheduled',
-        });
-      }
-
-      cursor.setDate(cursor.getDate() + 1);
-    }
-
-    if (toInsert.length === 0) {
-      return c.json({ created: 0, skipped: 0 }, 200);
+    if (plan.toInsert.length === 0) {
+      return c.json(plan.summary, 200);
     }
 
     // upsert with ignoreDuplicates to skip existing sessions
     const { data: inserted, error } = await supabase
       .from('sessions')
-      .upsert(toInsert, { onConflict: 'class_id,session_date,start_time', ignoreDuplicates: true })
-      .select('id');
+      .upsert(plan.toInsert, {
+        onConflict: 'class_id,session_date,start_time',
+        ignoreDuplicates: true,
+      })
+      .select('id, assignment_status');
 
     if (error) {
       return c.json({ error: error.message, code: 'DB_ERROR' }, 400);
     }
 
-    const created = inserted?.length ?? 0;
-    const skipped = toInsert.length - created;
+    const insertedRows = inserted ?? [];
+    const createdAssigned = insertedRows.filter(
+      (row) => row.assignment_status === 'assigned',
+    ).length;
+    const createdUnassigned = insertedRows.filter(
+      (row) => row.assignment_status === 'unassigned',
+    ).length;
+    const raceConditionSkipped = plan.toInsert.length - insertedRows.length;
 
-    return c.json({ created, skipped }, 200);
-  }
+    return c.json(
+      {
+        createdAssigned,
+        createdUnassigned,
+        skippedExisting: plan.summary.skippedExisting + raceConditionSkipped,
+        skippedNoTeacher: plan.summary.skippedNoTeacher,
+        totalPlanned: plan.summary.totalPlanned,
+      },
+      200,
+    );
+  },
+);
+
+// PATCH /api/classes/:id/sessions/batch-assign-teacher
+app.openapi(
+  createRoute({
+    method: 'patch',
+    path: '/{id}/sessions/batch-assign-teacher',
+    tags: ['Classes'],
+    summary: '批次指派班級課堂老師（單班級）',
+    request: {
+      params: z.object({ id: z.uuid() }),
+      body: { content: { 'application/json': { schema: BatchAssignBodySchema } } },
+    },
+    responses: {
+      200: {
+        description: '成功',
+        content: {
+          'application/json': {
+            schema: z.object({
+              updated: z.number(),
+              skippedConflicts: z.number(),
+              skippedNotEligible: z.number(),
+              conflicts: z.array(BatchAssignConflictSchema),
+              dryRun: z.boolean(),
+            }),
+          },
+        },
+      },
+      404: {
+        description: '班級不存在',
+        content: { 'application/json': { schema: ErrorSchema } },
+      },
+      409: {
+        description: '教師時段衝突（strict 模式）',
+        content: {
+          'application/json': {
+            schema: z.object({
+              error: z.string(),
+              code: z.string(),
+              updated: z.number(),
+              skippedConflicts: z.number(),
+              skippedNotEligible: z.number(),
+              conflicts: z.array(BatchAssignConflictSchema),
+              dryRun: z.boolean(),
+            }),
+          },
+        },
+      },
+      400: {
+        description: '參數或資料錯誤',
+        content: { 'application/json': { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c) => {
+    const supabase = c.get('supabase');
+    const orgId = c.get('orgId');
+    const userId = c.get('userId');
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+
+    const fromDate = new Date(body.from);
+    const toDate = new Date(body.to);
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime()) || fromDate > toDate) {
+      return c.json({ error: '無效日期格式', code: 'INVALID_DATE_RANGE' }, 400);
+    }
+
+    const weekdaySet = new Set(body.weekday ?? []);
+    const timeRanges = (body.timeRanges ?? []).map((range) => ({
+      startTime: normalizeTime(range.startTime),
+      endTime: normalizeTime(range.endTime),
+    }));
+
+    const { data: cls } = await supabase
+      .from('classes')
+      .select('id, name')
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .maybeSingle();
+
+    if (!cls) {
+      return c.json({ error: '班級不存在', code: 'NOT_FOUND' }, 404);
+    }
+
+    const { data: classSessions, error: classSessionsError } = await supabase
+      .from('sessions')
+      .select('id, session_date, start_time, end_time, status, assignment_status, teacher_id')
+      .eq('org_id', orgId)
+      .eq('class_id', id)
+      .gte('session_date', body.from)
+      .lte('session_date', body.to);
+
+    if (classSessionsError) {
+      return c.json({ error: classSessionsError.message, code: 'DB_ERROR' }, 400);
+    }
+
+    const filteredSessions = (classSessions || []).filter((session) => {
+      const sessionDate = session.session_date as string;
+      const sessionStart = normalizeTime(session.start_time as string);
+      const sessionEnd = normalizeTime(session.end_time as string);
+
+      if (weekdaySet.size > 0 && !weekdaySet.has(toWeekday(sessionDate))) {
+        return false;
+      }
+
+      if (timeRanges.length === 0) return true;
+      return timeRanges.some((range) =>
+        isTimeOverlap(sessionStart, sessionEnd, range.startTime, range.endTime),
+      );
+    });
+
+    const { data: teacherBusySessions, error: teacherBusyError } = await supabase
+      .from('sessions')
+      .select('id, session_date, start_time, end_time')
+      .eq('org_id', orgId)
+      .eq('teacher_id', body.toTeacherId)
+      .eq('status', 'scheduled')
+      .gte('session_date', body.from)
+      .lte('session_date', body.to);
+
+    if (teacherBusyError) {
+      return c.json({ error: teacherBusyError.message, code: 'DB_ERROR' }, 400);
+    }
+
+    const mode = body.mode as BatchAssignMode;
+    const dryRun = body.dryRun ?? false;
+    const plan = planBatchAssign({
+      mode,
+      includeAssigned: body.includeAssigned ?? false,
+      targetSessions: filteredSessions.map((session) => ({
+        id: session.id as string,
+        sessionDate: session.session_date as string,
+        startTime: normalizeTime(session.start_time as string),
+        endTime: normalizeTime(session.end_time as string),
+        status: session.status as 'scheduled' | 'completed' | 'cancelled',
+        assignmentStatus:
+          (session.assignment_status as 'assigned' | 'unassigned' | null) ??
+          deriveAssignmentStatus((session.teacher_id as string | null) ?? null),
+      })),
+      teacherBusySlots: (teacherBusySessions || []).map((session) => ({
+        sessionId: session.id as string,
+        sessionDate: session.session_date as string,
+        startTime: normalizeTime(session.start_time as string),
+        endTime: normalizeTime(session.end_time as string),
+      })),
+    });
+
+    if (!dryRun && mode === 'strict' && plan.conflicts.length > 0) {
+      return c.json(
+        {
+          error: '老師時段衝突，未執行更新',
+          code: 'TEACHER_CONFLICT',
+          updated: 0,
+          skippedConflicts: plan.skippedConflicts,
+          skippedNotEligible: plan.skippedNotEligible,
+          conflicts: plan.conflicts,
+          dryRun: false,
+        },
+        409,
+      );
+    }
+
+    if (!dryRun && plan.updatedIds.length > 0) {
+      const { error: updateError } = await supabase
+        .from('sessions')
+        .update({ teacher_id: body.toTeacherId, assignment_status: 'assigned' })
+        .in('id', plan.updatedIds);
+
+      if (updateError) {
+        return c.json({ error: updateError.message, code: 'DB_ERROR' }, 400);
+      }
+
+      logAudit(
+        supabase,
+        {
+          orgId,
+          userId,
+          resourceType: 'class',
+          resourceId: id,
+          resourceName: (cls.name as string | null) ?? null,
+          action: 'batch_assign_teacher',
+          details: {
+            from: body.from,
+            to: body.to,
+            mode,
+            updated: plan.updatedIds.length,
+            skippedConflicts: plan.skippedConflicts,
+            skippedNotEligible: plan.skippedNotEligible,
+          },
+        },
+        c.executionCtx.waitUntil.bind(c.executionCtx),
+      );
+    }
+
+    return c.json(
+      {
+        updated: plan.updatedIds.length,
+        skippedConflicts: plan.skippedConflicts,
+        skippedNotEligible: plan.skippedNotEligible,
+        conflicts: plan.conflicts,
+        dryRun,
+      },
+      200,
+    );
+  },
 );
 
 // POST /api/classes/:id/cancel-future-sessions
@@ -1276,11 +1552,7 @@ app.openapi(
     const { id } = c.req.valid('param');
 
     // 確認班級存在
-    const { data: cls } = await supabase
-      .from('classes')
-      .select('id')
-      .eq('id', id)
-      .single();
+    const { data: cls } = await supabase.from('classes').select('id').eq('id', id).single();
 
     if (!cls) {
       return c.json({ error: '班級不存在', code: 'NOT_FOUND' }, 404);
@@ -1301,7 +1573,7 @@ app.openapi(
     }
 
     return c.json({ cancelled: updated?.length ?? 0 }, 200);
-  }
+  },
 );
 
 export default app;

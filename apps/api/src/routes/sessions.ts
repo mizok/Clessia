@@ -1,5 +1,9 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import type { AppEnv } from '../index';
+import {
+  assertSessionOperable,
+  SessionUnassignedError,
+} from '../domain/session-assignment/session-operation-guard';
 
 // ============================================================
 // Schemas
@@ -18,6 +22,10 @@ const TimeSchema = z
 const SessionStatusSchema = z
   .enum(['scheduled', 'completed', 'cancelled'])
   .openapi('SessionStatus');
+
+const SessionAssignmentStatusSchema = z
+  .enum(['assigned', 'unassigned'])
+  .openapi('SessionAssignmentStatus');
 
 const SessionChangeTypeSchema = z
   .enum(['reschedule', 'substitute', 'cancellation'])
@@ -52,8 +60,9 @@ const SessionListItemSchema = z
     courseName: z.string(),
     campusId: z.uuid(),
     campusName: z.string(),
-    teacherId: z.uuid(),
-    teacherName: z.string(),
+    teacherId: z.uuid().nullable(),
+    teacherName: z.string().nullable(),
+    assignmentStatus: SessionAssignmentStatusSchema,
     hasChanges: z.boolean(),
   })
   .openapi('SessionListItem');
@@ -147,8 +156,9 @@ function mapSession(row: Record<string, unknown>, hasChanges: boolean) {
     courseName: (courseRow?.['name'] as string | undefined) ?? '',
     campusId: (campusRow?.['id'] as string | undefined) ?? '',
     campusName: (campusRow?.['name'] as string | undefined) ?? '',
-    teacherId: row['teacher_id'] as string,
-    teacherName: (teacherRow?.['display_name'] as string | undefined) ?? '',
+    teacherId: (row['teacher_id'] as string | null) ?? null,
+    teacherName: (teacherRow?.['display_name'] as string | undefined) ?? null,
+    assignmentStatus: (row['assignment_status'] as 'assigned' | 'unassigned' | null) ?? 'assigned',
     hasChanges,
   };
 }
@@ -170,6 +180,33 @@ function mapSessionChange(row: Record<string, unknown>) {
     reason: (row['reason'] as string | null) ?? null,
     createdByName: (row['created_by_name'] as string | null) ?? null,
     createdAt: row['created_at'] as string,
+  };
+}
+
+async function loadSessionOperationState(
+  supabase: AppEnv['Variables']['supabase'],
+  orgId: string,
+  id: string,
+): Promise<{
+  assignmentStatus: 'assigned' | 'unassigned';
+  status: 'scheduled' | 'completed' | 'cancelled';
+} | null> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('status, assignment_status, teacher_id')
+    .eq('org_id', orgId)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const assignmentStatus =
+    (data.assignment_status as 'assigned' | 'unassigned' | null) ??
+    ((data.teacher_id as string | null) ? 'assigned' : 'unassigned');
+
+  return {
+    assignmentStatus,
+    status: data.status as 'scheduled' | 'completed' | 'cancelled',
   };
 }
 
@@ -214,16 +251,18 @@ app.openapi(listSessionsRoute, async (c) => {
 
   let dbQuery = supabase
     .from('sessions')
-    .select(`
-      id, session_date, start_time, end_time, status,
+    .select(
+      `
+      id, session_date, start_time, end_time, status, assignment_status,
       class_id, teacher_id,
       classes!inner (
         name,
         courses!inner ( id, name ),
         campuses!inner ( id, name )
       ),
-      staff!inner ( display_name )
-    `)
+      staff ( display_name )
+    `,
+    )
     .eq('org_id', orgId)
     .gte('session_date', from)
     .lte('session_date', to)
@@ -268,7 +307,7 @@ app.openapi(listSessionsRoute, async (c) => {
     {
       data: rows.map((row) => mapSession(row, changedIds.has(row['id'] as string))),
     },
-    200
+    200,
   );
 });
 
@@ -307,11 +346,13 @@ app.openapi(getSessionChangesRoute, async (c) => {
 
   const { data, error } = await supabase
     .from('schedule_changes')
-    .select(`
+    .select(
+      `
       id, change_type, new_session_date, new_start_time, new_end_time,
       reason, created_by_name, created_at,
       staff!substitute_teacher_id ( id, display_name )
-    `)
+    `,
+    )
     .eq('org_id', orgId)
     .eq('session_id', id)
     .order('created_at', { ascending: false });
@@ -324,7 +365,7 @@ app.openapi(getSessionChangesRoute, async (c) => {
     {
       data: (data ?? []).map((row) => mapSessionChange(row as Record<string, unknown>)),
     },
-    200
+    200,
   );
 });
 
@@ -360,6 +401,14 @@ const cancelSessionRoute = createRoute({
         },
       },
     },
+    409: {
+      description: '課堂未指派老師',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+    },
     400: {
       description: '操作失敗',
       content: {
@@ -377,6 +426,19 @@ app.openapi(cancelSessionRoute, async (c) => {
   const userId = c.get('userId');
   const { id } = c.req.valid('param');
   const body = c.req.valid('json');
+
+  const sessionState = await loadSessionOperationState(supabase, orgId, id);
+  if (!sessionState) {
+    return c.json({ error: '課堂不存在', code: 'NOT_FOUND' }, 404);
+  }
+  try {
+    assertSessionOperable(sessionState);
+  } catch (error) {
+    if (error instanceof SessionUnassignedError) {
+      return c.json({ error: error.message, code: error.code }, 409);
+    }
+    throw error;
+  }
 
   const { data: updatedSession, error: updateError } = await supabase
     .from('sessions')
@@ -450,6 +512,22 @@ const substituteSessionRoute = createRoute({
         },
       },
     },
+    404: {
+      description: '課堂不存在',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+    },
+    409: {
+      description: '課堂未指派老師',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+    },
   },
 });
 
@@ -459,6 +537,19 @@ app.openapi(substituteSessionRoute, async (c) => {
   const userId = c.get('userId');
   const { id } = c.req.valid('param');
   const body = c.req.valid('json');
+
+  const sessionState = await loadSessionOperationState(supabase, orgId, id);
+  if (!sessionState) {
+    return c.json({ error: '課堂不存在', code: 'NOT_FOUND' }, 404);
+  }
+  try {
+    assertSessionOperable(sessionState);
+  } catch (error) {
+    if (error instanceof SessionUnassignedError) {
+      return c.json({ error: error.message, code: error.code }, 409);
+    }
+    throw error;
+  }
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
@@ -518,6 +609,22 @@ const rescheduleSessionRoute = createRoute({
         },
       },
     },
+    404: {
+      description: '課堂不存在',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+    },
+    409: {
+      description: '課堂未指派老師',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+    },
   },
 });
 
@@ -527,6 +634,19 @@ app.openapi(rescheduleSessionRoute, async (c) => {
   const userId = c.get('userId');
   const { id } = c.req.valid('param');
   const body = c.req.valid('json');
+
+  const sessionState = await loadSessionOperationState(supabase, orgId, id);
+  if (!sessionState) {
+    return c.json({ error: '課堂不存在', code: 'NOT_FOUND' }, 404);
+  }
+  try {
+    assertSessionOperable(sessionState);
+  } catch (error) {
+    if (error instanceof SessionUnassignedError) {
+      return c.json({ error: error.message, code: error.code }, 409);
+    }
+    throw error;
+  }
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')

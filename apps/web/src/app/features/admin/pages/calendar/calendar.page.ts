@@ -1,7 +1,7 @@
 import { Component, DestroyRef, OnInit, computed, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { addDays, addWeeks, endOfWeek, format, isToday, startOfWeek } from 'date-fns';
+import { addDays, addWeeks, endOfWeek, format, isSameWeek, isToday, startOfWeek } from 'date-fns';
 import { debounceTime, fromEvent } from 'rxjs';
 import { zhTW } from 'date-fns/locale';
 import { MessageService } from 'primeng/api';
@@ -114,10 +114,18 @@ export class CalendarPage implements OnInit {
     Array.from({ length: 7 }, (_, i) => addDays(this.weekStart(), i)),
   );
 
-  protected readonly weekLabel = computed(
-    () =>
-      `${format(this.weekStart(), 'yyyy/MM/dd')} – ${format(this.weekEnd(), 'MM/dd')}`,
-  );
+  protected readonly weekLabel = computed(() => {
+    const now = new Date();
+    const weekOpts = { weekStartsOn: 1 as const };
+    const start = this.weekStart();
+    const end = this.weekEnd();
+    const dateRange = `${format(start, 'M/d')} – ${format(end, 'M/d')}`;
+
+    if (isSameWeek(start, now, weekOpts)) return `本週 · ${dateRange}`;
+    if (isSameWeek(start, addWeeks(now, -1), weekOpts)) return `上週 · ${dateRange}`;
+    if (isSameWeek(start, addWeeks(now, 1), weekOpts)) return `下週 · ${dateRange}`;
+    return dateRange;
+  });
 
   protected readonly dayLabel = computed(() =>
     format(this.currentDate(), 'yyyy/MM/dd (EEE)', { locale: zhTW }),
@@ -135,6 +143,14 @@ export class CalendarPage implements OnInit {
   protected readonly gridHeight = computed(
     () => (CALENDAR_END_HOUR - CALENDAR_START_HOUR) * 2 * SLOT_HEIGHT_PX,
   );
+
+  protected readonly isCurrentPeriod = computed(() => {
+    const now = new Date();
+    if (this.isWeekView()) {
+      return isSameWeek(this.currentDate(), now, { weekStartsOn: 1 });
+    }
+    return isToday(this.currentDate());
+  });
 
   protected readonly activeTeachers = computed(() =>
     this.staff().filter((s) => s.roles.includes('teacher')),

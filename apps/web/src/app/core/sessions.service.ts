@@ -9,14 +9,15 @@ export interface Session {
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   status: 'scheduled' | 'completed' | 'cancelled';
+  assignmentStatus: 'assigned' | 'unassigned';
   classId: string;
   className: string;
   courseId: string;
   courseName: string;
   campusId: string;
   campusName: string;
-  teacherId: string;
-  teacherName: string;
+  teacherId: string | null;
+  teacherName: string | null;
   hasChanges: boolean;
 }
 
@@ -67,7 +68,7 @@ export class SessionsService {
   substitute(
     sessionId: string,
     substituteTeacherId: string,
-    reason?: string
+    reason?: string,
   ): Observable<{ success: boolean }> {
     return this.http.post<{ success: boolean }>(`${this.endpoint}/${sessionId}/substitute`, {
       substituteTeacherId,
@@ -80,7 +81,7 @@ export class SessionsService {
     newSessionDate: string,
     newStartTime: string,
     newEndTime: string,
-    reason?: string
+    reason?: string,
   ): Observable<{ success: boolean }> {
     return this.http.post<{ success: boolean }>(`${this.endpoint}/${sessionId}/reschedule`, {
       newSessionDate,

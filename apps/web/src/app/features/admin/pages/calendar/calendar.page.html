@@ -37,13 +37,15 @@
         [pTooltip]="isWeekView() ? '上一週' : '前一天'"
         tooltipStyleClass="clessia-tooltip"
       />
-      <p-button
-        label="今天"
-        severity="secondary"
-        [outlined]="true"
-        size="small"
-        (onClick)="goToday()"
-      />
+      @if (!isCurrentPeriod()) {
+        <p-button
+          [label]="isWeekView() ? '回本週' : '回今天'"
+          severity="secondary"
+          [outlined]="true"
+          size="small"
+          (onClick)="goToday()"
+        />
+      }
       <p-button
         icon="pi pi-chevron-right"
         [rounded]="true"
