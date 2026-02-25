@@ -1151,6 +1151,14 @@ export class ClassesPage implements OnInit {
   // ================================================================
 
   protected openGenerateDialog(cls: Class): void {
+    if (!cls.scheduleCount) {
+      this.messageService.add({
+        severity: 'warn',
+        summary: '無法產生課堂',
+        detail: '請先為此班級設定上課時間。',
+      });
+      return;
+    }
     this.generateTargetClass.set(cls);
     this.generateFrom.set(null);
     this.generateTo.set(null);

@@ -370,6 +370,9 @@
                               [outlined]="true"
                               severity="info"
                               (onClick)="openGenerateDialog(cls)"
+                              [disabled]="!cls.scheduleCount"
+                              [pTooltip]="!cls.scheduleCount ? '請先設定上課時間' : ''"
+                              tooltipPosition="top"
                             />
                             <p-button
                               label="批次指派老師"

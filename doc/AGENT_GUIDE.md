@@ -451,8 +451,8 @@ grep -A5 "INSERT INTO.*[table_name]" /tmp/check.sql
 nx serve api
 
 # 測試（需替換 TOKEN）
-curl http://localhost:8788/health
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8788/api/[resource]
+curl http://localhost:8787/health
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8787/api/[resource]
 ```
 
 ### Build 指令
