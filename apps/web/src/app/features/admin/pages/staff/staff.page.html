@@ -1,5 +1,5 @@
 <p-toast />
-<p-confirmDialog />
+<p-confirmDialog [appendTo]="overlayContainer" />
 
 <div class="staff">
   <!-- Page Header -->
@@ -304,12 +304,13 @@
 
 <!-- Create/Edit Dialog -->
 <p-dialog
+  [appendTo]="overlayContainer"
   [header]="dialogTitle()"
   [(visible)]="dialogVisible"
   [modal]="true"
   [closable]="!dialogLoading()"
-  [style]="{ width: '32rem' }"
   (onHide)="closeDialog()"
+  styleClass="staff-dialog" 
 >
   <div class="staff-dialog__form">
     <!-- Name Field -->

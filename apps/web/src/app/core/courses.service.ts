@@ -13,6 +13,7 @@ export interface Course {
   subjectName: string;
   description: string | null;
   isActive: boolean;
+  gradeLevels: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -41,6 +42,7 @@ export interface CreateCourseInput {
   name: string;
   subjectId: string;
   description?: string | null;
+  gradeLevels?: string[];
 }
 
 export interface UpdateCourseInput {
@@ -48,6 +50,7 @@ export interface UpdateCourseInput {
   subjectId?: string;
   description?: string | null;
   isActive?: boolean;
+  gradeLevels?: string[];
 }
 
 @Injectable({

@@ -19,7 +19,6 @@ const ScheduleSchema = z
     endTime: z.string(),
     teacherId: z.uuid().nullable(),
     teacherName: z.string().optional(),
-    effectiveFrom: z.string(),
     effectiveTo: z.string().nullable(),
   })
   .openapi('Schedule');
@@ -64,7 +63,6 @@ const CreateClassSchema = z
     courseId: z.uuid(),
     name: z.string().min(1).max(50),
     maxStudents: z.number().int().min(1).max(200).optional(),
-    gradeLevels: z.array(z.string()).optional(),
     nextClassId: z.uuid().nullable().optional(),
   })
   .openapi('CreateClass');
@@ -73,7 +71,6 @@ const UpdateClassSchema = z
   .object({
     name: z.string().min(1).max(50).optional(),
     maxStudents: z.number().int().min(1).max(200).optional(),
-    gradeLevels: z.array(z.string()).optional(),
     nextClassId: z.uuid().nullable().optional(),
     isActive: z.boolean().optional(),
   })
@@ -85,7 +82,6 @@ const CreateScheduleSchema = z
     startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
     endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
     teacherId: z.uuid().nullable().optional(),
-    effectiveFrom: z.string(),
     effectiveTo: z.string().nullable().optional(),
   })
   .openapi('CreateSchedule');
@@ -152,7 +148,6 @@ const CheckConflictsRequestSchema = z
         startTime: z.string(),
         endTime: z.string(),
         teacherId: z.uuid().nullable(),
-        effectiveFrom: z.string(),
         effectiveTo: z.string().nullable().optional(),
       }),
     ),
@@ -195,7 +190,6 @@ function mapSchedule(row: Record<string, unknown>) {
     endTime: row['end_time'] as string,
     teacherId: (row['teacher_id'] as string | null) ?? null,
     teacherName: (row['staff'] as { display_name: string } | null)?.display_name,
-    effectiveFrom: row['effective_from'] as string,
     effectiveTo: (row['effective_to'] as string | null) ?? null,
   };
 }
@@ -227,7 +221,8 @@ function mapClass(row: Record<string, unknown>, extras?: ClassExtras) {
     createdAt: row['created_at'] as string,
     updatedAt: row['updated_at'] as string,
     updatedBy: (row['updated_by'] as string | null) ?? null,
-    updatedByName: extras?.updatedByName ?? null,
+    updatedByName:
+      extras?.updatedByName || (row['ba_user'] as { name: string } | null)?.name || null,
   };
 }
 
@@ -278,7 +273,11 @@ app.openapi(
     const pageSize = parseInt(query.pageSize || '50');
     const offset = (page - 1) * pageSize;
 
-    let dbQuery = supabase.from('classes').select('*, courses(name)', { count: 'exact' });
+    let dbQuery = supabase
+      .from('classes')
+      .select('*, courses(name), schedules(*, staff(display_name)), ba_user!updated_by(name)', {
+        count: 'exact',
+      });
 
     if (query.search) dbQuery = dbQuery.ilike('name', `%${query.search}%`);
     if (query.campusId) dbQuery = dbQuery.eq('campus_id', query.campusId);
@@ -301,24 +300,12 @@ app.openapi(
     const hasUpcomingSet = new Set<string>();
 
     if (classIds.length > 0) {
-      const [schedulesResult, sessionsResult] = await Promise.all([
-        supabase.from('schedules').select('class_id, teacher_id').in('class_id', classIds),
-        supabase
-          .from('sessions')
-          .select('class_id')
-          .in('class_id', classIds)
-          .gte('session_date', new Date().toISOString().split('T')[0])
-          .eq('status', 'scheduled'),
-      ]);
-
-      for (const s of schedulesResult.data || []) {
-        const cid = s.class_id as string;
-        scheduleCountMap[cid] = (scheduleCountMap[cid] ?? 0) + 1;
-        if (s.teacher_id) {
-          scheduleTeacherMap[cid] = scheduleTeacherMap[cid] ?? [];
-          scheduleTeacherMap[cid].push(s.teacher_id as string);
-        }
-      }
+      const sessionsResult = await supabase
+        .from('sessions')
+        .select('class_id')
+        .in('class_id', classIds)
+        .gte('session_date', new Date().toISOString().split('T')[0])
+        .eq('status', 'scheduled');
 
       for (const s of sessionsResult.data || []) {
         hasUpcomingSet.add(s.class_id as string);
@@ -328,9 +315,13 @@ app.openapi(
     return c.json({
       data: rows.map((r) => {
         const id = r.id as string;
+        const schedules = (r['schedules'] as unknown[]) || [];
         return mapClass(r as Record<string, unknown>, {
-          scheduleCount: scheduleCountMap[id] ?? 0,
-          scheduleTeacherIds: scheduleTeacherMap[id] ?? [],
+          schedules,
+          scheduleCount: schedules.length,
+          scheduleTeacherIds: schedules
+            .map((s: any) => s.teacher_id)
+            .filter((tid): tid is string => !!tid),
           hasUpcomingSessions: hasUpcomingSet.has(id),
         });
       }),
@@ -432,12 +423,8 @@ app.openapi(
         if (sStart >= eEnd || eStart >= sEnd) continue;
 
         // 日期範圍重疊
-        const sFrom = s.effectiveFrom;
         const sTo = s.effectiveTo ?? null;
-        const eFrom = existing.effective_from as string;
         const eTo = (existing.effective_to as string | null) ?? null;
-        if (sTo && sTo < eFrom) continue;
-        if (eTo && eTo < sFrom) continue;
 
         const clsData = existing.classes as {
           name: string;
@@ -609,7 +596,11 @@ app.openapi(
     const { id } = c.req.valid('param');
 
     const [classResult, schedulesResult] = await Promise.all([
-      supabase.from('classes').select('*, courses(name)').eq('id', id).single(),
+      supabase
+        .from('classes')
+        .select('*, courses(name), ba_user!updated_by(name)')
+        .eq('id', id)
+        .single(),
       supabase.from('schedules').select('*, staff(display_name)').eq('class_id', id),
     ]);
 
@@ -691,7 +682,6 @@ app.openapi(
         course_id: body.courseId,
         name: body.name,
         max_students: body.maxStudents ?? 20,
-        grade_levels: body.gradeLevels ?? [],
         next_class_id: body.nextClassId ?? null,
         updated_by: userId,
       })
@@ -753,7 +743,6 @@ app.openapi(
     const updateData: Record<string, unknown> = { updated_by: userId };
     if (body.name !== undefined) updateData['name'] = body.name;
     if (body.maxStudents !== undefined) updateData['max_students'] = body.maxStudents;
-    if (body.gradeLevels !== undefined) updateData['grade_levels'] = body.gradeLevels;
     if (body.nextClassId !== undefined) updateData['next_class_id'] = body.nextClassId;
     if (body.isActive !== undefined) updateData['is_active'] = body.isActive;
 
@@ -951,7 +940,6 @@ app.openapi(
         start_time: body.startTime,
         end_time: body.endTime,
         teacher_id: body.teacherId ?? null,
-        effective_from: body.effectiveFrom,
         effective_to: body.effectiveTo ?? null,
       })
       .select('*, staff(display_name)')
@@ -1014,7 +1002,6 @@ app.openapi(
     if (body.startTime !== undefined) updateData['start_time'] = body.startTime;
     if (body.endTime !== undefined) updateData['end_time'] = body.endTime;
     if (body.teacherId !== undefined) updateData['teacher_id'] = body.teacherId;
-    if (body.effectiveFrom !== undefined) updateData['effective_from'] = body.effectiveFrom;
     if (body.effectiveTo !== undefined) updateData['effective_to'] = body.effectiveTo;
 
     const { data, error } = await supabase

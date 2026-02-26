@@ -209,13 +209,13 @@
   background: var(--zinc-50);
   height: var(--window-height);
   --app-header-height: 56px;
-}
 
-.shell-layout__body {
-  display: flex;
-  flex-direction: column;
-  flex: 1; /* Fill remaining space below header */
-  overflow: hidden; /* Prevent body scroll if content handles it */
+  &__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1; /* Fill remaining space below header */
+    overflow: hidden; /* Prevent body scroll if content handles it */
+  }
 }
 
 .shell-container {

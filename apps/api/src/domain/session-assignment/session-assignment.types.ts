@@ -7,7 +7,6 @@ export interface SessionGenerationSchedule {
   readonly endTime: string;
   readonly teacherId: string | null;
   readonly teacherName?: string;
-  readonly effectiveFrom: string;
   readonly effectiveTo: string | null;
 }
 

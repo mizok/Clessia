@@ -28,6 +28,7 @@ import {
 // Shared
 import { EmptyStateComponent } from '@shared/components/empty-state/empty-state.component';
 import { AuditLogDialogComponent } from '@shared/components/audit-log-dialog/audit-log-dialog.component';
+import { OverlayContainerDirective } from '@shared/directives/overlay-container.directive';
 
 @Component({
   selector: 'app-campuses',
@@ -58,6 +59,12 @@ export class CampusesPage implements OnInit {
   private readonly campusesService = inject(CampusesService);
   private readonly messageService = inject(MessageService);
   private readonly confirmationService = inject(ConfirmationService);
+  private readonly overlayContainerDirective = inject(OverlayContainerDirective, {
+    optional: true,
+  });
+  protected get overlayContainer(): HTMLElement | null {
+    return this.overlayContainerDirective?.nativeHTMLElement ?? null;
+  }
 
   // State
   readonly campuses = signal<Campus[]>([]);
@@ -83,9 +90,7 @@ export class CampusesPage implements OnInit {
 
   // Computed
   readonly isEditing = computed(() => this.editingCampus() !== null);
-  readonly dialogTitle = computed(() =>
-    this.isEditing() ? '編輯分校' : '新增分校'
-  );
+  readonly dialogTitle = computed(() => (this.isEditing() ? '編輯分校' : '新增分校'));
   readonly filteredCampuses = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
     if (!query) return this.campuses();
@@ -93,15 +98,11 @@ export class CampusesPage implements OnInit {
       (c) =>
         c.name.toLowerCase().includes(query) ||
         c.address?.toLowerCase().includes(query) ||
-        c.phone?.includes(query)
+        c.phone?.includes(query),
     );
   });
-  readonly activeCampusCount = computed(
-    () => this.campuses().filter((c) => c.isActive).length
-  );
-  readonly inactiveCampusCount = computed(
-    () => this.campuses().filter((c) => !c.isActive).length
-  );
+  readonly activeCampusCount = computed(() => this.campuses().filter((c) => c.isActive).length);
+  readonly inactiveCampusCount = computed(() => this.campuses().filter((c) => !c.isActive).length);
 
   ngOnInit(): void {
     this.loadCampuses();

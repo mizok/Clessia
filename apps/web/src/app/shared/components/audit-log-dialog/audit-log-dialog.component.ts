@@ -9,6 +9,7 @@ import { ButtonModule } from 'primeng/button';
 
 // Services
 import { AuditLogsService, type AuditLog } from '@core/audit-logs.service';
+import { OverlayContainerDirective } from '@shared/directives/overlay-container.directive';
 
 interface ActionConfig {
   label: string;
@@ -48,6 +49,12 @@ export class AuditLogDialogComponent {
   readonly visible = model(false);
 
   private readonly auditLogsService = inject(AuditLogsService);
+  private readonly overlayContainerDirective = inject(OverlayContainerDirective, {
+    optional: true,
+  });
+  protected get overlayContainer(): HTMLElement | null {
+    return this.overlayContainerDirective?.nativeHTMLElement ?? null;
+  }
 
   protected readonly logs = signal<AuditLog[]>([]);
   protected readonly loading = signal(false);

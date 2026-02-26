@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, input, signal, computed } from '@angular/core';
+import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -19,7 +20,8 @@ import { SkeletonModule } from 'primeng/skeleton';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { TabsModule } from 'primeng/tabs';
-import { MessageService, ConfirmationService } from 'primeng/api';
+import { MenuModule } from 'primeng/menu';
+import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
 
 // Services
 import {
@@ -33,9 +35,15 @@ import {
   CheckConflictScheduleInput,
   ScheduleConflict,
 } from '@core/classes.service';
-import { CoursesService, Course, CreateCourseInput, UpdateCourseInput } from '@core/courses.service';
+import {
+  CoursesService,
+  Course,
+  CreateCourseInput,
+  UpdateCourseInput,
+} from '@core/courses.service';
 import { CampusesService, Campus } from '@core/campuses.service';
 import { SubjectsService, Subject } from '@core/subjects.service';
+import { OverlayContainerDirective } from '@shared/directives/overlay-container.directive';
 import { StaffService, Staff } from '@core/staff.service';
 import { SessionsService, Session, SessionQueryParams } from '@core/sessions.service';
 import { addMonths, format } from 'date-fns';
@@ -52,7 +60,6 @@ export interface ScheduleFormEntry {
   startTime: string;
   endTime: string;
   teacherId: string | null;
-  effectiveFrom: string;
   effectiveTo: string | null;
 }
 
@@ -83,6 +90,7 @@ interface CourseGroup {
     IconFieldModule,
     InputIconModule,
     TabsModule,
+    MenuModule,
     EmptyStateComponent,
     AuditLogDialogComponent,
     BatchAssignWizardComponent,
@@ -102,6 +110,15 @@ export class ClassesPage implements OnInit {
   private readonly sessionsService = inject(SessionsService);
   private readonly messageService = inject(MessageService);
   private readonly confirmationService = inject(ConfirmationService);
+  private readonly breakpointObserver = inject(BreakpointObserver);
+  private readonly overlayContainerDirective = inject(OverlayContainerDirective, {
+    optional: true,
+  });
+  protected get overlayContainer(): HTMLElement | null {
+    return this.overlayContainerDirective?.nativeHTMLElement ?? null;
+  }
+
+  protected readonly isMobile = signal(false);
 
   // ---- Data ----
   protected readonly courses = signal<Course[]>([]);
@@ -111,20 +128,21 @@ export class ClassesPage implements OnInit {
   protected readonly staff = signal<Staff[]>([]);
   protected readonly loading = signal(false);
   protected readonly auditLogVisible = signal(false);
-  protected readonly expandedClassId = signal<string | null>(null);
+  protected readonly detailVisible = signal(false);
+  protected readonly selectedClassForDetail = signal<Class | null>(null);
+  protected readonly classActionMenuItems = signal<MenuItem[]>([]);
+  protected readonly selectedClassForMenu = signal<Class | null>(null);
   protected readonly expandedCourseIds = signal<Set<string>>(new Set());
 
   // ---- Selection ----
   protected readonly selectedClassIds = signal<Set<string>>(new Set());
 
   protected readonly selectedActiveCount = computed(
-    () =>
-      this.classes().filter((cl) => this.selectedClassIds().has(cl.id) && cl.isActive).length
+    () => this.classes().filter((cl) => this.selectedClassIds().has(cl.id) && cl.isActive).length,
   );
 
   protected readonly selectedInactiveCount = computed(
-    () =>
-      this.classes().filter((cl) => this.selectedClassIds().has(cl.id) && !cl.isActive).length
+    () => this.classes().filter((cl) => this.selectedClassIds().has(cl.id) && !cl.isActive).length,
   );
 
   protected readonly allVisibleSelected = computed(() => {
@@ -142,18 +160,18 @@ export class ClassesPage implements OnInit {
 
   // ---- Computed options ----
   protected readonly campusOptions = computed(() =>
-    this.campuses().map((c) => ({ label: c.name, value: c.id }))
+    this.campuses().map((c) => ({ label: c.name, value: c.id })),
   );
   protected readonly subjectOptions = computed(() =>
-    this.subjects().map((s) => ({ label: s.name, value: s.id }))
+    this.subjects().map((s) => ({ label: s.name, value: s.id })),
   );
   protected readonly staffOptions = computed(() =>
-    this.staff().map((s) => ({ label: s.displayName, value: s.id }))
+    this.staff().map((s) => ({ label: s.displayName, value: s.id })),
   );
 
   // 班級 dialog 對應的課程（用來過濾老師）
-  private readonly classDialogCourse = computed(() =>
-    this.courses().find((c) => c.id === this.classDialogCourseId()) ?? null
+  private readonly classDialogCourse = computed(
+    () => this.courses().find((c) => c.id === this.classDialogCourseId()) ?? null,
   );
 
   // 只顯示「服務該分校 + 教該科目」的老師
@@ -163,9 +181,7 @@ export class ClassesPage implements OnInit {
 
     return this.staff()
       .filter(
-        (s) =>
-          s.campusIds.includes(course.campusId) &&
-          s.subjectIds.includes(course.subjectId)
+        (s) => s.campusIds.includes(course.campusId) && s.subjectIds.includes(course.subjectId),
       )
       .map((s) => ({ label: s.displayName, value: s.id }));
   });
@@ -226,7 +242,7 @@ export class ClassesPage implements OnInit {
       !!this.selectedSubjectId() ||
       this.selectedTeacherIds().length > 0 ||
       this.statusFilter() !== null ||
-      this.showInactiveCourses()
+      this.showInactiveCourses(),
   );
 
   // ---- Course Dialog ----
@@ -240,10 +256,11 @@ export class ClassesPage implements OnInit {
     subjectId: '',
     description: null as string | null,
     isActive: true,
+    gradeLevels: [] as string[],
   });
 
   protected readonly courseDialogTitle = computed(() =>
-    this.courseDialogMode() === 'create' ? '新增課程' : '編輯課程'
+    this.courseDialogMode() === 'create' ? '新增課程' : '編輯課程',
   );
 
   // ---- Class Dialog ----
@@ -255,15 +272,43 @@ export class ClassesPage implements OnInit {
   protected readonly classForm = signal({
     name: '',
     maxStudents: 20,
-    gradeLevels: [] as string[],
     nextClassId: null as string | null,
     isActive: true,
   });
   protected readonly scheduleEntries = signal<ScheduleFormEntry[]>([]);
 
   protected readonly classDialogTitle = computed(() =>
-    this.classDialogMode() === 'create' ? '新增班級' : '編輯班級'
+    this.classDialogMode() === 'create' ? '新增班級' : '編輯班級',
   );
+
+  protected readonly courseDialogBreadcrumb = computed(() => {
+    const campusId =
+      this.courseForm().campusId ||
+      (this.editingCourseId()
+        ? this.courses().find((c) => c.id === this.editingCourseId())?.campusId
+        : null);
+    return campusId ? this.getCampusName(campusId) : '';
+  });
+
+  protected readonly classDialogBreadcrumb = computed(() => {
+    const course = this.classDialogCourse();
+    if (!course) return '';
+    return `${this.getCampusName(course.campusId)} › ${course.name}`;
+  });
+
+  protected classBreadcrumb(cls: Class | null): string {
+    if (!cls) return '';
+    const campus = this.getCampusName(cls.campusId);
+    const course = this.getCourse(cls.courseId)?.name ?? '';
+    return `${campus} › ${course} › ${cls.name}`;
+  }
+
+  protected classParentBreadcrumb(cls: Class | null): string {
+    if (!cls) return '';
+    const campus = this.getCampusName(cls.campusId);
+    const course = this.getCourse(cls.courseId)?.name ?? '';
+    return `${campus} › ${course}`;
+  }
 
   // ---- Deactivate Class Dialog ----
   protected readonly deactivateDialogVisible = signal(false);
@@ -284,10 +329,10 @@ export class ClassesPage implements OnInit {
   protected readonly generateLoading = signal(false);
   protected readonly generateStep = signal<'input' | 'preview'>('input');
   protected readonly newSessionCount = computed(
-    () => this.previewSessions().filter((s) => !s.exists).length
+    () => this.previewSessions().filter((s) => !s.exists).length,
   );
   protected readonly skippedSessionCount = computed(
-    () => this.previewSessions().filter((s) => s.exists).length
+    () => this.previewSessions().filter((s) => s.exists).length,
   );
 
   // ---- Batch Assign Wizard Dialog ----
@@ -313,18 +358,18 @@ export class ClassesPage implements OnInit {
 
   // ---- Static options ----
   protected readonly gradeOptions = [
-    { label: '國小一', value: '國小一' },
-    { label: '國小二', value: '國小二' },
-    { label: '國小三', value: '國小三' },
-    { label: '國小四', value: '國小四' },
-    { label: '國小五', value: '國小五' },
-    { label: '國小六', value: '國小六' },
-    { label: '國中一', value: '國中一' },
-    { label: '國中二', value: '國中二' },
-    { label: '國中三', value: '國中三' },
-    { label: '高中一', value: '高中一' },
-    { label: '高中二', value: '高中二' },
-    { label: '高中三', value: '高中三' },
+    { label: '小一', value: '小一' },
+    { label: '小二', value: '小二' },
+    { label: '小三', value: '小三' },
+    { label: '小四', value: '小四' },
+    { label: '小五', value: '小五' },
+    { label: '小六', value: '小六' },
+    { label: '國一', value: '國一' },
+    { label: '國二', value: '國二' },
+    { label: '國三', value: '國三' },
+    { label: '高一', value: '高一' },
+    { label: '高二', value: '高二' },
+    { label: '高三', value: '高三' },
   ];
 
   protected readonly weekdayOptions = [
@@ -348,6 +393,9 @@ export class ClassesPage implements OnInit {
   // ================================================================
 
   ngOnInit(): void {
+    this.breakpointObserver.observe([Breakpoints.Handset]).subscribe((result) => {
+      this.isMobile.set(result.matches);
+    });
     this.loadAll();
   }
 
@@ -379,35 +427,59 @@ export class ClassesPage implements OnInit {
   // Expand/Collapse
   // ================================================================
 
-  protected isExpanded(classId: string): boolean {
-    return this.expandedClassId() === classId;
+  protected openDetail(cls: Class): void {
+    // 獲取最新詳情以獲取修改者資訊（API 已支援 updatedByName）
+    this.classesService.get(cls.id).subscribe({
+      next: (res) => {
+        this.selectedClassForDetail.set(res.data);
+        this.detailVisible.set(true);
+      },
+      error: (err) => {
+        console.error('Failed to load class detail', err);
+        // 若失敗則顯示現有資料
+        this.selectedClassForDetail.set(cls);
+        this.detailVisible.set(true);
+      },
+    });
   }
 
-  protected toggleExpand(classId: string): void {
-    if (this.expandedClassId() === classId) {
-      this.expandedClassId.set(null);
-      return;
-    }
-    this.classesService.get(classId).subscribe({
-      next: (res) => {
-        this.classes.update((list) =>
-          list.map((cl) => {
-            if (cl.id !== classId) return cl;
-            const schedules = res.data.schedules ?? [];
-            return {
-              ...res.data,
-              scheduleCount: schedules.length,
-              scheduleTeacherIds: schedules
-                .map((s) => s.teacherId)
-                .filter((id): id is string => !!id),
-              hasUpcomingSessions: cl.hasUpcomingSessions,
-            };
-          })
-        );
-        this.expandedClassId.set(classId);
+  protected openActionMenu(event: Event, cls: Class, menu: any): void {
+    this.selectedClassForMenu.set(cls);
+    this.classActionMenuItems.set([
+      {
+        label: '編輯班級',
+        icon: 'pi pi-pencil',
+        command: () => this.openEditClassDialog(cls),
       },
-      error: (err) => console.error('Failed to load class detail', err),
-    });
+      {
+        label: '產生課堂',
+        icon: 'pi pi-calendar-plus',
+        disabled: !cls.scheduleCount,
+        command: () => this.openGenerateDialog(cls),
+      },
+      {
+        label: '查看課堂',
+        icon: 'pi pi-list',
+        command: () => this.openSessionListDialog(cls),
+      },
+      {
+        separator: true,
+      },
+      {
+        label: cls.isActive ? '停用班級' : '啟用班級',
+        icon: cls.isActive ? 'pi pi-ban' : 'pi pi-check-circle',
+        itemClass: cls.isActive ? 'text-orange-500' : 'text-green-500',
+        command: () => this.confirmToggleActive(cls),
+      },
+      {
+        label: '刪除班級',
+        icon: 'pi pi-trash',
+        disabled: cls.hasUpcomingSessions,
+        itemClass: 'text-red-500',
+        command: () => this.confirmDeleteClass(cls),
+      },
+    ]);
+    menu.toggle(event);
   }
 
   protected onCampusTabChange(value: string | number | null | undefined): void {
@@ -449,8 +521,9 @@ export class ClassesPage implements OnInit {
       campusId: this.campusOptions()[0]?.value ?? '',
       name: '',
       subjectId: this.subjectOptions()[0]?.value ?? '',
-      description: null,
+      description: '',
       isActive: true,
+      gradeLevels: [],
     });
     this.courseDialogVisible.set(true);
   }
@@ -464,6 +537,7 @@ export class ClassesPage implements OnInit {
       subjectId: course.subjectId,
       description: course.description ?? null,
       isActive: course.isActive,
+      gradeLevels: course.gradeLevels || [],
     });
     this.courseDialogVisible.set(true);
   }
@@ -589,7 +663,6 @@ export class ClassesPage implements OnInit {
     this.classForm.set({
       name: '',
       maxStudents: 20,
-      gradeLevels: [],
       nextClassId: null,
       isActive: true,
     });
@@ -604,7 +677,6 @@ export class ClassesPage implements OnInit {
     this.classForm.set({
       name: cls.name,
       maxStudents: cls.maxStudents,
-      gradeLevels: [...cls.gradeLevels],
       nextClassId: cls.nextClassId,
       isActive: cls.isActive,
     });
@@ -615,9 +687,8 @@ export class ClassesPage implements OnInit {
         startTime: s.startTime.substring(0, 5),
         endTime: s.endTime.substring(0, 5),
         teacherId: s.teacherId,
-        effectiveFrom: s.effectiveFrom,
         effectiveTo: s.effectiveTo,
-      }))
+      })),
     );
     this.classDialogVisible.set(true);
   }
@@ -627,7 +698,6 @@ export class ClassesPage implements OnInit {
   }
 
   protected addScheduleEntry(): void {
-    const today = new Date().toISOString().split('T')[0];
     this.scheduleEntries.update((list) => [
       ...list,
       {
@@ -635,7 +705,6 @@ export class ClassesPage implements OnInit {
         startTime: '09:00',
         endTime: '11:00',
         teacherId: null,
-        effectiveFrom: today,
         effectiveTo: null,
       },
     ]);
@@ -647,7 +716,7 @@ export class ClassesPage implements OnInit {
 
   protected updateScheduleEntry(index: number, field: string, value: unknown): void {
     this.scheduleEntries.update((list) =>
-      list.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry))
+      list.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry)),
     );
   }
 
@@ -676,7 +745,6 @@ export class ClassesPage implements OnInit {
         startTime: e.startTime,
         endTime: e.endTime,
         teacherId: e.teacherId,
-        effectiveFrom: e.effectiveFrom,
         effectiveTo: e.effectiveTo,
       }));
 
@@ -722,7 +790,6 @@ export class ClassesPage implements OnInit {
         courseId,
         name: form.name.trim(),
         maxStudents: form.maxStudents,
-        gradeLevels: form.gradeLevels,
         nextClassId: form.nextClassId,
       };
       this.classesService.create(input).subscribe({
@@ -733,7 +800,7 @@ export class ClassesPage implements OnInit {
             return;
           }
           this.addSchedulesSequentially(res.data.id, entries, 0, () =>
-            this.reloadClass(res.data.id, 'create')
+            this.reloadClass(res.data.id, 'create'),
           );
         },
         error: (err) => {
@@ -750,31 +817,28 @@ export class ClassesPage implements OnInit {
       const updateInput: UpdateClassInput = {
         name: form.name.trim(),
         maxStudents: form.maxStudents,
-        gradeLevels: form.gradeLevels,
         nextClassId: form.nextClassId,
         isActive: form.isActive,
       };
       this.classesService.update(classId, updateInput).subscribe({
         next: () => {
-          const existingIds = (
-            this.classes()
-              .find((cl) => cl.id === classId)
-              ?.schedules ?? []
-          ).map((s) => s.id);
+          const existingIds = (this.classes().find((cl) => cl.id === classId)?.schedules ?? []).map(
+            (s) => s.id,
+          );
           const updatedEntries = this.scheduleEntries();
           const keptIds = new Set(updatedEntries.filter((e) => e.id).map((e) => e.id!));
           const toDelete = existingIds.filter((id) => !keptIds.has(id));
           const toAdd = updatedEntries.filter((e) => !e.id);
 
           const deleteOps = toDelete.map((sid) =>
-            this.classesService.deleteSchedule(classId, sid).toPromise()
+            this.classesService.deleteSchedule(classId, sid).toPromise(),
           );
           Promise.all(deleteOps).then(() => {
             if (toAdd.length === 0) {
               this.reloadClass(classId, 'edit');
             } else {
               this.addSchedulesSequentially(classId, toAdd, 0, () =>
-                this.reloadClass(classId, 'edit')
+                this.reloadClass(classId, 'edit'),
               );
             }
           });
@@ -795,7 +859,7 @@ export class ClassesPage implements OnInit {
     classId: string,
     entries: ScheduleFormEntry[],
     index: number,
-    onComplete: () => void
+    onComplete: () => void,
   ): void {
     if (index >= entries.length) {
       onComplete();
@@ -811,7 +875,6 @@ export class ClassesPage implements OnInit {
       startTime: entry.startTime,
       endTime: entry.endTime,
       teacherId: entry.teacherId,
-      effectiveFrom: entry.effectiveFrom,
       effectiveTo: entry.effectiveTo,
     };
     this.classesService.addSchedule(classId, input).subscribe({
@@ -820,15 +883,17 @@ export class ClassesPage implements OnInit {
     });
   }
 
+  protected getCourse(courseId: string) {
+    return this.courses().find((c) => c.id === courseId);
+  }
+
   private reloadClass(classId: string, mode: 'create' | 'edit'): void {
     this.classesService.get(classId).subscribe({
       next: (res) => {
         const schedules = res.data.schedules ?? [];
         const derived = {
           scheduleCount: schedules.length,
-          scheduleTeacherIds: schedules
-            .map((s) => s.teacherId)
-            .filter((id): id is string => !!id),
+          scheduleTeacherIds: schedules.map((s) => s.teacherId).filter((id): id is string => !!id),
         };
         if (mode === 'create') {
           this.classes.update((list) => [
@@ -840,11 +905,11 @@ export class ClassesPage implements OnInit {
             list.map((cl) =>
               cl.id === classId
                 ? { ...res.data, ...derived, hasUpcomingSessions: cl.hasUpcomingSessions }
-                : cl
-            )
+                : cl,
+            ),
           );
         }
-        this.expandedClassId.set(classId);
+        if (res.data.isActive) this.openDetail(res.data);
         this.classDialogVisible.set(false);
         this.classDialogLoading.set(false);
         this.messageService.add({
@@ -907,7 +972,7 @@ export class ClassesPage implements OnInit {
         this.classesService.batchSetActive(ids, true).subscribe({
           next: (res) => {
             this.classes.update((list) =>
-              list.map((cl) => (ids.includes(cl.id) ? { ...cl, isActive: true } : cl))
+              list.map((cl) => (ids.includes(cl.id) ? { ...cl, isActive: true } : cl)),
             );
             this.selectedClassIds.set(new Set());
             this.messageService.add({
@@ -945,7 +1010,7 @@ export class ClassesPage implements OnInit {
         this.classesService.batchSetActive(ids, false).subscribe({
           next: (res) => {
             this.classes.update((list) =>
-              list.map((cl) => (ids.includes(cl.id) ? { ...cl, isActive: false } : cl))
+              list.map((cl) => (ids.includes(cl.id) ? { ...cl, isActive: false } : cl)),
             );
             this.selectedClassIds.set(new Set());
             this.messageService.add({
@@ -980,9 +1045,7 @@ export class ClassesPage implements OnInit {
       accept: () => {
         this.classesService.batchDelete(ids).subscribe({
           next: (res) => {
-            this.classes.update((list) =>
-              list.filter((cl) => !res.deletedIds.includes(cl.id))
-            );
+            this.classes.update((list) => list.filter((cl) => !res.deletedIds.includes(cl.id)));
             this.selectedClassIds.set(new Set());
             const detail =
               res.skipped > 0
@@ -1023,7 +1086,10 @@ export class ClassesPage implements OnInit {
         this.classesService.delete(cls.id).subscribe({
           next: () => {
             this.classes.update((list) => list.filter((c) => c.id !== cls.id));
-            if (this.expandedClassId() === cls.id) this.expandedClassId.set(null);
+            if (this.selectedClassForDetail()?.id === cls.id) {
+              this.detailVisible.set(false);
+              this.selectedClassForDetail.set(null);
+            }
             this.messageService.add({
               severity: 'success',
               summary: '刪除成功',
@@ -1076,16 +1142,24 @@ export class ClassesPage implements OnInit {
                   scheduleTeacherIds: c.scheduleTeacherIds,
                   hasUpcomingSessions: c.hasUpcomingSessions,
                 }
-              : c
-          )
+              : c,
+          ),
         );
         this.deactivateDialogVisible.set(false);
         this.deactivateLoading.set(false);
-        this.messageService.add({ severity: 'success', summary: '停用成功', detail: `「${cls.name}」已停用` });
+        this.messageService.add({
+          severity: 'success',
+          summary: '停用成功',
+          detail: `「${cls.name}」已停用`,
+        });
       },
       error: (err) => {
         this.deactivateLoading.set(false);
-        this.messageService.add({ severity: 'error', summary: '停用失敗', detail: err.error?.error || '請稍後再試' });
+        this.messageService.add({
+          severity: 'error',
+          summary: '停用失敗',
+          detail: err.error?.error || '請稍後再試',
+        });
       },
     });
   }
@@ -1107,8 +1181,8 @@ export class ClassesPage implements OnInit {
                   scheduleTeacherIds: c.scheduleTeacherIds,
                   hasUpcomingSessions: c.hasUpcomingSessions,
                 }
-              : c
-          )
+              : c,
+          ),
         );
         this.classesService.cancelFutureSessions(cls.id).subscribe({
           next: (r) => {
@@ -1134,7 +1208,11 @@ export class ClassesPage implements OnInit {
       },
       error: (err) => {
         this.deactivateLoading.set(false);
-        this.messageService.add({ severity: 'error', summary: '停用失敗', detail: err.error?.error || '請稍後再試' });
+        this.messageService.add({
+          severity: 'error',
+          summary: '停用失敗',
+          detail: err.error?.error || '請稍後再試',
+        });
       },
     });
   }
@@ -1152,15 +1230,23 @@ export class ClassesPage implements OnInit {
                   scheduleTeacherIds: c.scheduleTeacherIds,
                   hasUpcomingSessions: c.hasUpcomingSessions,
                 }
-              : c
-          )
+              : c,
+          ),
         );
         const action = expectedIsActive ? '停用' : '啟用';
-        this.messageService.add({ severity: 'success', summary: `${action}成功`, detail: `「${cls.name}」已${action}` });
+        this.messageService.add({
+          severity: 'success',
+          summary: `${action}成功`,
+          detail: `「${cls.name}」已${action}`,
+        });
       },
       error: (err) => {
         const action = expectedIsActive ? '停用' : '啟用';
-        this.messageService.add({ severity: 'error', summary: `${action}失敗`, detail: err.error?.error || '請稍後再試' });
+        this.messageService.add({
+          severity: 'error',
+          summary: `${action}失敗`,
+          detail: err.error?.error || '請稍後再試',
+        });
       },
     });
   }
@@ -1350,12 +1436,17 @@ export class ClassesPage implements OnInit {
 
   protected getScheduleSummary(schedules: Schedule[] | undefined): string {
     if (!schedules || schedules.length === 0) return '';
-    return schedules
-      .map(
-        (s) =>
-          `${this.getWeekdayLabel(s.weekday)} ${s.startTime.substring(0, 5)}-${s.endTime.substring(0, 5)}`
-      )
-      .join('、');
+    const items = schedules.map(
+      (s) => `${this.getWeekdayLabel(s.weekday)} ${s.startTime.substring(0, 5)}`,
+    );
+
+    const maxVisible = this.isMobile() ? 1 : 2;
+
+    if (items.length <= maxVisible) {
+      return items.join('、');
+    }
+
+    return `${items.slice(0, maxVisible).join('、')} (+${items.length - maxVisible})`;
   }
 
   protected getCampusName(campusId: string): string {

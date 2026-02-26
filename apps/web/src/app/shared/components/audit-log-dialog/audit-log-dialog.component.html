@@ -1,12 +1,13 @@
 <p-dialog
+  [appendTo]="overlayContainer"
   [header]="title()"
   [visible]="visible()"
   (visibleChange)="visible.set($event)"
   [modal]="true"
-  [style]="{ width: '860px', maxWidth: '95vw' }"
   [draggable]="false"
   [resizable]="false"
   (onShow)="onShow()"
+  styleClass="audit-log-dialog" 
 >
   <div class="audit-log-dialog__body">
     @if (loading()) {

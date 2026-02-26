@@ -1,4 +1,13 @@
-import { Component, computed, DestroyRef, effect, inject, input, output, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 // PrimeNG
@@ -11,6 +20,7 @@ import { MultiSelectModule } from 'primeng/multiselect';
 import { MessageModule } from 'primeng/message';
 import { TooltipModule } from 'primeng/tooltip';
 import { MessageService } from 'primeng/api';
+import { OverlayContainerDirective } from '@shared/directives/overlay-container.directive';
 
 import {
   ClassesService,
@@ -57,6 +67,12 @@ export class BatchAssignWizardComponent {
   // ── Outputs ───────────────────────────────────────────────────────────
   readonly completed = output<void>();
   readonly cancelled = output<void>();
+  private readonly overlayContainerDirective = inject(OverlayContainerDirective, {
+    optional: true,
+  });
+  protected get overlayContainer(): HTMLElement | null {
+    return this.overlayContainerDirective?.nativeHTMLElement ?? null;
+  }
 
   // ── DI ────────────────────────────────────────────────────────────────
   private readonly classesService = inject(ClassesService);

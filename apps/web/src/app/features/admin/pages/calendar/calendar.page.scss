@@ -270,7 +270,9 @@
     cursor: pointer;
     font-size: var(--text-xs);
     overflow: hidden;
-    transition: opacity var(--transition-fast), box-shadow var(--transition-fast);
+    transition:
+      opacity var(--transition-fast),
+      box-shadow var(--transition-fast);
     display: flex;
     flex-direction: column;
     gap: 1px;
@@ -501,40 +503,6 @@
 }
 
 // =============================================================================
-// PrimeNG Dialog override (scoped)
-// =============================================================================
-
-:host ::ng-deep {
-  .cal-dialog {
-    .p-dialog-header {
-      padding: var(--space-5) var(--space-6);
-      border-bottom: 1px solid var(--zinc-100);
-
-      .p-dialog-title {
-        font-size: var(--text-lg);
-        font-weight: var(--font-semibold);
-        color: var(--zinc-900);
-      }
-    }
-
-    .p-dialog-content {
-      padding: var(--space-5) var(--space-6);
-    }
-
-    .p-dialog-footer {
-      padding: var(--space-4) var(--space-6);
-      border-top: 1px solid var(--zinc-100);
-      background: var(--zinc-50);
-    }
-  }
-
-  .p-tag {
-    font-size: var(--text-xs);
-    font-weight: var(--font-medium);
-    padding: 3px 8px;
-    border-radius: var(--radius-full);
-  }
-}
 
 // =============================================================================
 // Responsive
@@ -565,14 +533,6 @@
     &__filter {
       min-width: 0;
       flex: 1 1 120px;
-    }
-  }
-
-  :host ::ng-deep {
-    .cal-dialog {
-      width: calc(100vw - var(--space-8)) !important;
-      max-width: 100%;
-      margin: var(--space-4);
     }
   }
 

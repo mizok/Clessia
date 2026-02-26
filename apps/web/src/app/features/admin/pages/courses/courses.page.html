@@ -1,5 +1,5 @@
 <p-toast />
-<p-confirmDialog />
+<p-confirmDialog [appendTo]="overlayContainer" />
 
 <div class="courses">
   <!-- Page Header -->
@@ -138,8 +138,9 @@
               <tr>
                 <th style="width: 25%">課程名稱</th>
                 <th style="width: 20%">分校</th>
-                <th style="width: 15%">科目</th>
-                <th style="width: 20%">說明</th>
+                <th style="width: 10%">科目</th>
+                <th style="width: 15%">適合年級</th>
+                <th style="width: 15%">說明</th>
                 <th style="width: 10%">狀態</th>
                 <th style="width: 10%; text-align: right">操作</th>
               </tr>
@@ -161,6 +162,15 @@
                 </td>
                 <td>
                   <p-tag [value]="course.subjectName" severity="info" />
+                </td>
+                <td>
+                  <div class="course-table__grades">
+                    @for (grade of course.gradeLevels; track grade) {
+                      <p-tag [value]="grade" severity="secondary" [rounded]="true" styleClass="mr-1 mb-1" />
+                    } @empty {
+                      <span class="course-table__empty">未設定</span>
+                    }
+                  </div>
                 </td>
                 <td>
                   @if (course.description) {
@@ -228,6 +238,16 @@
                   <i class="pi pi-tag"></i>
                   <p-tag [value]="course.subjectName" severity="info" />
                 </div>
+                <div class="course-card__field">
+                  <i class="pi pi-users"></i>
+                  <div class="course-card__grades">
+                    @for (grade of course.gradeLevels; track grade) {
+                      <p-tag [value]="grade" severity="secondary" [rounded]="true" />
+                    } @empty {
+                      <span class="course-table__empty">未設定年級</span>
+                    }
+                  </div>
+                </div>
                 @if (course.description) {
                   <div class="course-card__field course-card__field--description">
                     <i class="pi pi-align-left"></i>
@@ -271,12 +291,13 @@
 
 <!-- Create/Edit Dialog -->
 <p-dialog
+  [appendTo]="overlayContainer"
   [header]="dialogTitle()"
   [(visible)]="dialogVisible"
   [modal]="true"
   [closable]="!dialogLoading()"
-  [style]="{ width: '32rem' }"
   (onHide)="closeDialog()"
+  stylClass="course-dialog"
 >
   <div class="course-dialog__form">
     <!-- Campus Field (only for create) -->
@@ -343,6 +364,22 @@
         (ngModelChange)="updateSubjectId($event)"
         placeholder="選擇科目"
         [disabled]="dialogLoading()"
+        styleClass="w-full"
+      />
+    </div>
+
+    <!-- Grade Levels Field -->
+    <div class="course-dialog__field">
+      <label for="gradeLevels" class="course-dialog__label">適合年級</label>
+      <p-multiselect
+        inputId="gradeLevels"
+        [options]="gradeOptions"
+        [ngModel]="formData().gradeLevels"
+        (ngModelChange)="updateGradeLevels($event)"
+        placeholder="選擇適合年級"
+        [disabled]="dialogLoading()"
+        [maxSelectedLabels]="3"
+        selectedItemsLabel="已選擇 {0} 個年級"
         styleClass="w-full"
       />
     </div>

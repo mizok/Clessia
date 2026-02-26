@@ -13,6 +13,7 @@ import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { TooltipModule } from 'primeng/tooltip';
+import { OverlayContainerDirective } from '@shared/directives/overlay-container.directive';
 
 import type { Campus } from '@core/campuses.service';
 import { CampusesService } from '@core/campuses.service';
@@ -55,6 +56,12 @@ export class CalendarPage implements OnInit {
   private readonly sessionsService = inject(SessionsService);
   private readonly messageService = inject(MessageService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly overlayContainerDirective = inject(OverlayContainerDirective, {
+    optional: true,
+  });
+  protected get overlayContainer(): HTMLElement | null {
+    return this.overlayContainerDirective?.nativeHTMLElement ?? null;
+  }
 
   // ── View state (signals) ───────────────────────────────────────────────
   protected readonly currentDate = signal(new Date());
@@ -106,9 +113,7 @@ export class CalendarPage implements OnInit {
     startOfWeek(this.currentDate(), { weekStartsOn: 1 }),
   );
 
-  protected readonly weekEnd = computed(() =>
-    endOfWeek(this.currentDate(), { weekStartsOn: 1 }),
-  );
+  protected readonly weekEnd = computed(() => endOfWeek(this.currentDate(), { weekStartsOn: 1 }));
 
   protected readonly weekDays = computed(() =>
     Array.from({ length: 7 }, (_, i) => addDays(this.weekStart(), i)),
@@ -295,9 +300,7 @@ export class CalendarPage implements OnInit {
     return map[type];
   }
 
-  protected changeTypeSeverity(
-    type: ScheduleChange['changeType'],
-  ): 'secondary' | 'warn' | 'info' {
+  protected changeTypeSeverity(type: ScheduleChange['changeType']): 'secondary' | 'warn' | 'info' {
     const map: Record<ScheduleChange['changeType'], 'secondary' | 'warn' | 'info'> = {
       cancellation: 'secondary',
       substitute: 'warn',

@@ -11,7 +11,6 @@ export interface Schedule {
   endTime: string;
   teacherId: string | null;
   teacherName?: string;
-  effectiveFrom: string; // YYYY-MM-DD
   effectiveTo: string | null;
 }
 
@@ -76,7 +75,6 @@ export interface CreateScheduleInput {
   startTime: string;
   endTime: string;
   teacherId: string | null;
-  effectiveFrom: string;
   effectiveTo?: string | null;
 }
 
@@ -95,7 +93,6 @@ export interface CheckConflictScheduleInput {
   startTime: string;
   endTime: string;
   teacherId: string | null;
-  effectiveFrom: string;
   effectiveTo?: string | null;
 }
 

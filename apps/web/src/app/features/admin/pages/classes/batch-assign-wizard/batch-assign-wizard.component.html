@@ -57,7 +57,7 @@
             [filter]="true"
             filterPlaceholder="搜尋老師"
             styleClass="w-full"
-            appendTo="body"
+            [appendTo]="overlayContainer"
           />
         </div>
 
@@ -101,7 +101,7 @@
               dateFormat="yy/mm/dd"
               placeholder="選擇開始日期"
               [showIcon]="true"
-              appendTo="body"
+              [appendTo]="overlayContainer"
               styleClass="w-full"
             />
           </div>
@@ -113,7 +113,7 @@
               dateFormat="yy/mm/dd"
               placeholder="選擇結束日期"
               [showIcon]="true"
-              appendTo="body"
+              [appendTo]="overlayContainer"
               styleClass="w-full"
             />
           </div>
@@ -213,7 +213,7 @@
             (ngModelChange)="selectedWeekdays.set($event)"
             placeholder="全部星期"
             styleClass="w-full"
-            appendTo="body"
+            [appendTo]="overlayContainer"
             [showClear]="true"
           />
         </div>
@@ -225,7 +225,7 @@
             [ngModel]="conflictMode()"
             (ngModelChange)="conflictMode.set($event)"
             styleClass="w-full"
-            appendTo="body"
+            [appendTo]="overlayContainer"
           />
         </div>
 

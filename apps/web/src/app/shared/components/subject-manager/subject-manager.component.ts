@@ -9,6 +9,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { MessageService } from 'primeng/api';
 import { SubjectsService, Subject } from '@core/subjects.service';
 import { signal } from '@angular/core';
+import { OverlayContainerDirective } from '@shared/directives/overlay-container.directive';
 
 @Component({
   selector: 'app-subject-manager',
@@ -29,6 +30,12 @@ import { signal } from '@angular/core';
 export class SubjectManagerComponent {
   private readonly subjectsService = inject(SubjectsService);
   private readonly messageService = inject(MessageService);
+  private readonly overlayContainerDirective = inject(OverlayContainerDirective, {
+    optional: true,
+  });
+  protected get overlayContainer(): HTMLElement | null {
+    return this.overlayContainerDirective?.nativeHTMLElement ?? null;
+  }
 
   readonly visible = model(false);
   readonly changed = output<Subject[]>();
@@ -83,9 +90,7 @@ export class SubjectManagerComponent {
     this.saving.set(true);
     this.subjectsService.update(id, name).subscribe({
       next: (res) => {
-        this.subjects.update((list) =>
-          list.map((s) => (s.id === id ? res.data : s)),
-        );
+        this.subjects.update((list) => list.map((s) => (s.id === id ? res.data : s)));
         this.editingId.set(null);
         this.editingName.set('');
         this.saving.set(false);

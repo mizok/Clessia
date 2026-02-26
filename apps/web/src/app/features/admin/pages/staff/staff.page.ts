@@ -38,6 +38,7 @@ import { SubjectsService, Subject } from '@core/subjects.service';
 import { EmptyStateComponent } from '@shared/components/empty-state/empty-state.component';
 import { SubjectManagerComponent } from '@shared/components/subject-manager/subject-manager.component';
 import { AuditLogDialogComponent } from '@shared/components/audit-log-dialog/audit-log-dialog.component';
+import { OverlayContainerDirective } from '@shared/directives/overlay-container.directive';
 
 const PERMISSION_OPTIONS: { value: Permission; label: string; description: string }[] = [
   { value: 'basic_operations', label: '日常行政', description: '查詢與處理報名、出勤、請假' },
@@ -95,6 +96,12 @@ export class StaffPage implements OnInit {
   private readonly subjectsService = inject(SubjectsService);
   private readonly messageService = inject(MessageService);
   private readonly confirmationService = inject(ConfirmationService);
+  private readonly overlayContainerDirective = inject(OverlayContainerDirective, {
+    optional: true,
+  });
+  protected get overlayContainer(): HTMLElement | null {
+    return this.overlayContainerDirective?.nativeHTMLElement ?? null;
+  }
 
   // Constants exposed to template
   protected readonly permissionOptions = PERMISSION_OPTIONS;
@@ -155,8 +162,7 @@ export class StaffPage implements OnInit {
 
     if (query) {
       list = list.filter(
-        (s) =>
-          s.displayName.toLowerCase().includes(query) || s.email.toLowerCase().includes(query)
+        (s) => s.displayName.toLowerCase().includes(query) || s.email.toLowerCase().includes(query),
       );
     }
 
@@ -175,18 +181,20 @@ export class StaffPage implements OnInit {
     return list;
   });
 
-  readonly adminCount = computed(() => this.staffList().filter((s) => s.roles.includes('admin')).length);
+  readonly adminCount = computed(
+    () => this.staffList().filter((s) => s.roles.includes('admin')).length,
+  );
   readonly teacherCount = computed(
-    () => this.staffList().filter((s) => s.roles.includes('teacher')).length
+    () => this.staffList().filter((s) => s.roles.includes('teacher')).length,
   );
   readonly activeCount = computed(() => this.staffList().filter((s) => s.isActive).length);
 
   readonly campusOptions = computed(() =>
-    this.campuses().map((c) => ({ value: c.id, label: c.name }))
+    this.campuses().map((c) => ({ value: c.id, label: c.name })),
   );
 
   readonly subjectOptions = computed(() =>
-    this.subjects().map((subject) => ({ value: subject.id, label: subject.name }))
+    this.subjects().map((subject) => ({ value: subject.id, label: subject.name })),
   );
 
   ngOnInit(): void {

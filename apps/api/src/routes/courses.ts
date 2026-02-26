@@ -17,6 +17,7 @@ const CourseSchema = z
     subjectName: z.string(),
     description: z.string().nullable(),
     isActive: z.boolean(),
+    gradeLevels: z.array(z.string()).default([]).openapi({ description: '適合年級' }),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -40,6 +41,7 @@ const CreateCourseSchema = z
     name: z.string().min(1).max(50).openapi({ description: '課程名稱', example: '國一數學' }),
     subjectId: z.uuid().openapi({ description: '科目 ID' }),
     description: z.string().max(500).nullable().optional().openapi({ description: '課程說明' }),
+    gradeLevels: z.array(z.string()).optional().openapi({ description: '適合年級' }),
   })
   .openapi('CreateCourse');
 
@@ -49,6 +51,7 @@ const UpdateCourseSchema = z
     subjectId: z.uuid().optional(),
     description: z.string().max(500).nullable().optional(),
     isActive: z.boolean().optional(),
+    gradeLevels: z.array(z.string()).optional(),
   })
   .openapi('UpdateCourse');
 
@@ -84,6 +87,7 @@ function mapCourse(row: Record<string, unknown>) {
     subjectName: ((row['subjects'] as { name: string } | null)?.name ?? '') as string,
     description: row['description'] as string | null,
     isActive: row['is_active'] as boolean,
+    gradeLevels: (row['grade_levels'] as string[]) ?? [],
     createdAt: row['created_at'] as string,
     updatedAt: row['updated_at'] as string,
   };
@@ -273,6 +277,7 @@ app.openapi(createCourseRoute, async (c) => {
       name: body.name,
       subject_id: body.subjectId,
       description: body.description || null,
+      grade_levels: body.gradeLevels || [],
     })
     .select('*, campuses(name), subjects(name)')
     .single();
@@ -346,6 +351,7 @@ app.openapi(updateRoute, async (c) => {
   if (body.subjectId !== undefined) updateData['subject_id'] = body.subjectId;
   if (body.description !== undefined) updateData['description'] = body.description;
   if (body.isActive !== undefined) updateData['is_active'] = body.isActive;
+  if (body.gradeLevels !== undefined) updateData['grade_levels'] = body.gradeLevels;
 
   const { data, error } = await supabase
     .from('courses')

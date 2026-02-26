@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, model } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -13,9 +13,11 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
+import { OverlayContainerDirective } from '@shared/directives/overlay-container.directive';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { SelectModule } from 'primeng/select';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { TextareaModule } from 'primeng/textarea';
 import { MessageService, ConfirmationService } from 'primeng/api';
 
@@ -62,6 +64,7 @@ interface CampusOption {
     IconFieldModule,
     InputIconModule,
     SelectModule,
+    MultiSelectModule,
     TextareaModule,
     EmptyStateComponent,
     SubjectManagerComponent,
@@ -76,6 +79,12 @@ export class CoursesPage implements OnInit {
   private readonly subjectsService = inject(SubjectsService);
   private readonly messageService = inject(MessageService);
   private readonly confirmationService = inject(ConfirmationService);
+  private readonly overlayContainerDirective = inject(OverlayContainerDirective, {
+    optional: true,
+  });
+  protected get overlayContainer(): HTMLElement | null {
+    return this.overlayContainerDirective?.nativeHTMLElement ?? null;
+  }
 
   // State
   readonly courses = signal<Course[]>([]);
@@ -85,9 +94,9 @@ export class CoursesPage implements OnInit {
   readonly searchQuery = signal('');
   readonly selectedCampusId = signal<string | null>(null);
   readonly selectedSubjectId = signal<string | null>(null);
-  readonly dialogVisible = signal(false);
+  readonly dialogVisible = model(false);
   readonly dialogLoading = signal(false);
-  readonly subjectManagerVisible = signal(false);
+  readonly subjectManagerVisible = model(false);
 
   // Edit form state
   readonly editingCourse = signal<Course | null>(null);
@@ -97,19 +106,34 @@ export class CoursesPage implements OnInit {
     subjectId: string;
     description: string;
     isActive: boolean;
+    gradeLevels: string[];
   }>({
     campusId: '',
     name: '',
     subjectId: '',
     description: '',
     isActive: true,
+    gradeLevels: [],
   });
+
+  protected readonly gradeOptions = [
+    { label: '小一', value: '小一' },
+    { label: '小二', value: '小二' },
+    { label: '小三', value: '小三' },
+    { label: '小四', value: '小四' },
+    { label: '小五', value: '小五' },
+    { label: '小六', value: '小六' },
+    { label: '國一', value: '國一' },
+    { label: '國二', value: '國二' },
+    { label: '國三', value: '國三' },
+    { label: '高一', value: '高一' },
+    { label: '高二', value: '高二' },
+    { label: '高三', value: '高三' },
+  ];
 
   // Computed
   readonly isEditing = computed(() => this.editingCourse() !== null);
-  readonly dialogTitle = computed(() =>
-    this.isEditing() ? '編輯課程' : '新增課程'
-  );
+  readonly dialogTitle = computed(() => (this.isEditing() ? '編輯課程' : '新增課程'));
 
   readonly campusOptions = computed<CampusOption[]>(() => {
     return this.campuses()
@@ -147,23 +171,19 @@ export class CoursesPage implements OnInit {
           c.name.toLowerCase().includes(query) ||
           c.subjectName.toLowerCase().includes(query) ||
           c.description?.toLowerCase().includes(query) ||
-          c.campusName?.toLowerCase().includes(query)
+          c.campusName?.toLowerCase().includes(query),
       );
     }
 
     return result;
   });
 
-  readonly activeCourseCount = computed(
-    () => this.courses().filter((c) => c.isActive).length
-  );
+  readonly activeCourseCount = computed(() => this.courses().filter((c) => c.isActive).length);
 
-  readonly inactiveCourseCount = computed(
-    () => this.courses().filter((c) => !c.isActive).length
-  );
+  readonly inactiveCourseCount = computed(() => this.courses().filter((c) => !c.isActive).length);
 
   readonly hasActiveFilters = computed(
-    () => !!this.selectedCampusId() || !!this.selectedSubjectId() || !!this.searchQuery()
+    () => !!this.selectedCampusId() || !!this.selectedSubjectId() || !!this.searchQuery(),
   );
 
   ngOnInit(): void {
@@ -227,6 +247,7 @@ export class CoursesPage implements OnInit {
       subjectId: this.subjectOptions()[0]?.value || '',
       description: '',
       isActive: true,
+      gradeLevels: [],
     });
     this.dialogVisible.set(true);
   }
@@ -239,6 +260,7 @@ export class CoursesPage implements OnInit {
       subjectId: course.subjectId,
       description: course.description || '',
       isActive: course.isActive,
+      gradeLevels: course.gradeLevels || [],
     });
     this.dialogVisible.set(true);
   }
@@ -287,6 +309,7 @@ export class CoursesPage implements OnInit {
         subjectId: form.subjectId,
         description: form.description.trim() || null,
         isActive: form.isActive,
+        gradeLevels: form.gradeLevels,
       };
 
       this.coursesService.update(course.id, input).subscribe({
@@ -316,6 +339,7 @@ export class CoursesPage implements OnInit {
         name: form.name.trim(),
         subjectId: form.subjectId,
         description: form.description.trim() || null,
+        gradeLevels: form.gradeLevels,
       };
 
       this.coursesService.create(input).subscribe({
@@ -397,6 +421,10 @@ export class CoursesPage implements OnInit {
 
   updateIsActive(value: boolean): void {
     this.formData.update((f) => ({ ...f, isActive: value }));
+  }
+
+  updateGradeLevels(value: string[]): void {
+    this.formData.update((f) => ({ ...f, gradeLevels: value }));
   }
 
   onSubjectsChanged(updated: Subject[]): void {

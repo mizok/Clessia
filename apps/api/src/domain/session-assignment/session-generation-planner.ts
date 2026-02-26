@@ -63,7 +63,6 @@ export function buildSessionGenerationPlan(
 
     for (const schedule of input.schedules) {
       if (schedule.weekday !== weekday) continue;
-      if (sessionDate < schedule.effectiveFrom) continue;
       if (schedule.effectiveTo && sessionDate > schedule.effectiveTo) continue;
 
       const startTime = normalizeTime(schedule.startTime);

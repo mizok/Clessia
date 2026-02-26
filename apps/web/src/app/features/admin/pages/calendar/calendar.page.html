@@ -68,7 +68,7 @@
       optionValue="id"
       placeholder="所有分校"
       [showClear]="true"
-      appendTo="body"
+      [appendTo]="overlayContainer"
       [(ngModel)]="selectedCampusId"
       (onChange)="onFilterChange()"
     />
@@ -79,7 +79,7 @@
       optionValue="id"
       placeholder="所有課程"
       [showClear]="true"
-      appendTo="body"
+      [appendTo]="overlayContainer"
       [(ngModel)]="selectedCourseId"
       (onChange)="onFilterChange()"
     />
@@ -90,7 +90,7 @@
       optionValue="id"
       placeholder="所有老師"
       [showClear]="true"
-      appendTo="body"
+      [appendTo]="overlayContainer"
       [(ngModel)]="selectedTeacherId"
       (onChange)="onFilterChange()"
     />
@@ -217,6 +217,7 @@
 
 <!-- ── Detail Popup ────────────────────────────────────────────────────── -->
 <p-dialog
+  [appendTo]="overlayContainer"
   [visible]="showDetail()"
   (visibleChange)="showDetail.set($event)"
   [header]="selectedSession()?.className ?? '課堂詳情'"
@@ -224,8 +225,6 @@
   [draggable]="false"
   [resizable]="false"
   styleClass="cal-dialog"
-  [breakpoints]="{ '768px': '100vw' }"
-  [style]="{ width: '480px' }"
 >
   @if (selectedSession(); as s) {
     <div class="cal-detail">
@@ -330,6 +329,7 @@
 
 <!-- ── Cancel Dialog ──────────────────────────────────────────────────── -->
 <p-dialog
+  [appendTo]="overlayContainer"
   [visible]="showCancelDialog()"
   (visibleChange)="showCancelDialog.set($event)"
   header="確認停課"
@@ -337,8 +337,6 @@
   [draggable]="false"
   [resizable]="false"
   styleClass="cal-dialog"
-  [breakpoints]="{ '768px': '100vw' }"
-  [style]="{ width: '400px' }"
 >
   <div class="cal-op-form">
     <p class="cal-op-form__warning">
@@ -379,6 +377,7 @@
 
 <!-- ── Substitute Dialog ──────────────────────────────────────────────── -->
 <p-dialog
+  [appendTo]="overlayContainer"
   [visible]="showSubstituteDialog()"
   (visibleChange)="showSubstituteDialog.set($event)"
   header="安排代課"
@@ -386,8 +385,6 @@
   [draggable]="false"
   [resizable]="false"
   styleClass="cal-dialog"
-  [breakpoints]="{ '768px': '100vw' }"
-  [style]="{ width: '400px' }"
 >
   <div class="cal-op-form">
     <div class="cal-op-form__field">
@@ -436,6 +433,7 @@
 
 <!-- ── Reschedule Dialog ──────────────────────────────────────────────── -->
 <p-dialog
+  [appendTo]="overlayContainer"
   [visible]="showRescheduleDialog()"
   (visibleChange)="showRescheduleDialog.set($event)"
   header="安排調課"
@@ -443,8 +441,6 @@
   [draggable]="false"
   [resizable]="false"
   styleClass="cal-dialog"
-  [breakpoints]="{ '768px': '100vw' }"
-  [style]="{ width: '420px' }"
 >
   <div class="cal-op-form">
     <div class="cal-op-form__field">
