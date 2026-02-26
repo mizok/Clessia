@@ -417,8 +417,7 @@ select {
 
 .p-dialog {
   max-height: calc(var(--shell-layout-body-height) - var(--space-3) * 2) !important;
-  width: calc(var(--shell-layout-body-width) - var(--space-3) * 2) !important;
-  max-width: 30rem;
+  max-width: calc(var(--shell-layout-body-width) - var(--space-3) * 2) !important;
   --p-dialog-content-padding: var(--space-4) !important;
 
   .p-dialog-header {
@@ -432,7 +431,7 @@ select {
   }
 
   @include bp.respond-to('mobile') {
-    max-width: calc(100vw - var(--space-4));
+    max-width: calc(100vw - var(--space-2) * 2);
 
     .p-dialog-header,
     .p-dialog-footer {

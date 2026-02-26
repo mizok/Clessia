@@ -1,4 +1,4 @@
-import { OpenAPIHono } from '@hono/zod-openapi';
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { swaggerUI } from '@hono/swagger-ui';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
@@ -44,6 +44,13 @@ export type AppEnv = {
 
 const app = new OpenAPIHono<AppEnv>();
 
+const SystemTimeResponseSchema = z
+  .object({
+    epochMs: z.number(),
+    iso: z.string(),
+  })
+  .openapi('SystemTimeResponse');
+
 // ============================================================
 // Global Middleware
 // ============================================================
@@ -74,6 +81,35 @@ app.get('/', (c) => {
 app.get('/health', (c) => {
   return c.json({ healthy: true, timestamp: new Date().toISOString() });
 });
+
+app.openapi(
+  createRoute({
+    method: 'get',
+    path: '/system-time',
+    tags: ['System'],
+    summary: '取得伺服器時間',
+    responses: {
+      200: {
+        description: '成功取得伺服器時間',
+        content: {
+          'application/json': {
+            schema: SystemTimeResponseSchema,
+          },
+        },
+      },
+    },
+  }),
+  (c) => {
+    const now = new Date();
+    return c.json(
+      {
+        epochMs: now.getTime(),
+        iso: now.toISOString(),
+      },
+      200
+    );
+  }
+);
 
 // ============================================================
 // OpenAPI Documentation
