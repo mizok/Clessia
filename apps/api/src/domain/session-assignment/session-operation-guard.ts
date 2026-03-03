@@ -9,6 +9,24 @@ export class SessionUnassignedError extends Error {
   }
 }
 
+export class SessionCancelledError extends Error {
+  readonly code = 'SESSION_CANCELLED';
+
+  constructor() {
+    super('課堂已停課，無法操作');
+    this.name = 'SessionCancelledError';
+  }
+}
+
+export class SessionCompletedError extends Error {
+  readonly code = 'SESSION_COMPLETED';
+
+  constructor() {
+    super('課堂已完成，無法操作');
+    this.name = 'SessionCompletedError';
+  }
+}
+
 export interface SessionOperationState {
   readonly assignmentStatus: SessionAssignmentStatus;
   readonly status: 'scheduled' | 'completed' | 'cancelled';
@@ -17,5 +35,11 @@ export interface SessionOperationState {
 export function assertSessionOperable(session: SessionOperationState): void {
   if (session.assignmentStatus === 'unassigned') {
     throw new SessionUnassignedError();
+  }
+  if (session.status === 'cancelled') {
+    throw new SessionCancelledError();
+  }
+  if (session.status === 'completed') {
+    throw new SessionCompletedError();
   }
 }
