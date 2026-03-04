@@ -29,6 +29,11 @@ export interface Class {
   scheduleCount?: number;
   scheduleTeacherIds?: string[];
   hasUpcomingSessions?: boolean;
+  hasAnySessions?: boolean;
+  upcomingCancelledCount?: number;
+  upcomingUnassignedCount?: number;
+  upcomingClassConflictCount?: number;
+  upcomingTeacherConflictCount?: number;
   schedules?: Schedule[];
   createdAt: string;
   updatedAt: string;
@@ -142,6 +147,41 @@ export interface BatchAssignTeacherResult {
   dryRun: boolean;
 }
 
+export type BatchSessionConflictReason =
+  | 'status_not_editable'
+  | 'status_not_cancellable'
+  | 'status_not_reopenable'
+  | 'class_conflict'
+  | 'teacher_conflict';
+
+export interface BatchSessionConflict {
+  sessionId: string;
+  sessionDate: string;
+  reason: BatchSessionConflictReason;
+  detail: string;
+  conflictingSessionId?: string;
+}
+
+export interface BatchSessionActionResult {
+  updated: number;
+  skipped: number;
+  processableIds: string[];
+  conflicts: BatchSessionConflict[];
+  dryRun: boolean;
+}
+
+export interface BatchUpdateSessionTimeInput {
+  sessionIds: string[];
+  startTime: string;
+  endTime: string;
+  dryRun?: boolean;
+}
+
+export interface BatchCancelSessionsInput {
+  sessionIds: string[];
+  dryRun?: boolean;
+}
+
 export interface GenerateSessionsResult {
   createdAssigned: number;
   createdUnassigned: number;
@@ -248,6 +288,36 @@ export class ClassesService {
   ): Observable<BatchAssignTeacherResult> {
     return this.http.patch<BatchAssignTeacherResult>(
       `${this.endpoint}/${classId}/sessions/batch-assign-teacher`,
+      input,
+    );
+  }
+
+  batchUpdateSessionTime(
+    classId: string,
+    input: BatchUpdateSessionTimeInput,
+  ): Observable<BatchSessionActionResult> {
+    return this.http.patch<BatchSessionActionResult>(
+      `${this.endpoint}/${classId}/sessions/batch-update-time`,
+      input,
+    );
+  }
+
+  batchCancelSessions(
+    classId: string,
+    input: BatchCancelSessionsInput,
+  ): Observable<BatchSessionActionResult> {
+    return this.http.patch<BatchSessionActionResult>(
+      `${this.endpoint}/${classId}/sessions/batch-cancel`,
+      input,
+    );
+  }
+
+  batchUncancelSessions(
+    classId: string,
+    input: BatchCancelSessionsInput,
+  ): Observable<BatchSessionActionResult> {
+    return this.http.patch<BatchSessionActionResult>(
+      `${this.endpoint}/${classId}/sessions/batch-uncancel`,
       input,
     );
   }

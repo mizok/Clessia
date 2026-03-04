@@ -22,6 +22,8 @@
           [rowsPerPageOptions]="pagination.rowsPerPageOptions"
           [showCurrentPageReport]="pagination.showCurrentPageReport"
           [currentPageReportTemplate]="pagination.currentPageReportTemplate"
+          [showPageLinks]="!isCompactPaginator()"
+          [showFirstLastIcon]="!isCompactPaginator()"
           [alwaysShow]="pagination.alwaysShow"
           [appendTo]="'body'"
           (onPageChange)="handlePageChange($event)"

@@ -35,7 +35,7 @@ import { PaginatorModule, type PaginatorState } from 'primeng/paginator';
 import { CourseFormDialogComponent } from '../courses/course-form-dialog.component';
 import { ClassFormDialogComponent } from './class-form-dialog/class-form-dialog.component';
 import { GenerateSessionsDialogComponent } from './generate-sessions-dialog/generate-sessions-dialog.component';
-import { SessionListDialogComponent } from './session-list-dialog/session-list-dialog.component';
+// SessionListDialogComponent removed — replaced by calendar list view
 import { ClassDetailDialogComponent } from './class-detail-dialog/class-detail-dialog.component';
 import { DeactivateClassDialogComponent } from './deactivate-class-dialog/deactivate-class-dialog.component';
 
@@ -360,7 +360,7 @@ export class ClassesPage implements OnInit {
       {
         label: '管理課堂',
         icon: 'pi pi-list',
-        command: () => this.openSessionListDialog(cls),
+        command: () => this.navigateToCalendarList(cls),
       },
       {
         separator: true,
@@ -707,18 +707,11 @@ export class ClassesPage implements OnInit {
       });
   }
 
-  protected openSessionListDialog(cls: Class): void {
-    const course = this.courses().find((c) => c.id === cls.courseId);
-    this.dialogService.open(SessionListDialogComponent, {
-      header: '課堂列表',
-      width: '800px',
-      modal: true,
-      showHeader: false,
-      appendTo: this.overlayContainer || 'body',
-      data: {
-        cls,
-        staff: this.staff(),
-        subjectId: course?.subjectId,
+  protected navigateToCalendarList(cls: Class): void {
+    this.router.navigate(['/admin/calendar'], {
+      queryParams: {
+        view: 'list',
+        classId: cls.id,
       },
     });
   }

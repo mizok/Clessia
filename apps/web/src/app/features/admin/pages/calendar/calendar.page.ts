@@ -9,6 +9,7 @@ import {
   inject,
   input,
   signal,
+  viewChild,
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -136,6 +137,8 @@ export class CalendarPage implements OnInit, OnDestroy {
 
   // Date picker popup
   protected readonly showDatePicker = signal(false);
+  private readonly datepickerPopupRef = viewChild<ElementRef<HTMLElement>>('datepickerPopup');
+  private readonly subtitleButtonRef = viewChild<ElementRef<HTMLElement>>('subtitleButton');
 
   // ── Filter state ───────────────────────────────────────────────────────
   protected readonly selectedCampusId = signal<string | null>(null);
@@ -330,9 +333,9 @@ export class CalendarPage implements OnInit, OnDestroy {
   onDocumentClick(event: MouseEvent): void {
     if (this.showDatePicker()) {
       const target = event.target as HTMLElement;
-      const dpPopup = this.elementRef.nativeElement.querySelector('.cal__datepicker-popup');
-      const dpButton = this.elementRef.nativeElement.querySelector('.cal__subtitle');
-      if (dpPopup && !dpPopup.contains(target) && dpButton && !dpButton.contains(target)) {
+      const popupEl = this.datepickerPopupRef()?.nativeElement;
+      const buttonEl = this.subtitleButtonRef()?.nativeElement;
+      if (popupEl && !popupEl.contains(target) && buttonEl && !buttonEl.contains(target)) {
         this.showDatePicker.set(false);
       }
     }

@@ -17,6 +17,7 @@ import { AuthService, type UserRole } from '@core/auth.service';
 import { AutoOpenTooltipDirective } from '@shared/directives/auto-open-tooltip.directive';
 import { DeviceService } from '@core/device.service';
 import { InheritSizeDirective } from '@shared/directives/inherit-size.directive';
+import { OverlayContainerService } from '@core/overlay-container.service';
 import { OverlayContainerDirective } from '@shared/directives/overlay-container.directive';
 
 @Component({
@@ -38,11 +39,9 @@ export class ShellLayoutComponent {
   @ViewChild('op') op!: Popover;
 
   private readonly shellBody = viewChild<ElementRef<HTMLElement>>('shellBody');
-  private readonly overlayContainerDirective = inject(OverlayContainerDirective, {
-    optional: true,
-  });
+  private readonly overlayContainerService = inject(OverlayContainerService);
   protected get overlayContainer(): HTMLElement | null {
-    return this.overlayContainerDirective?.nativeHTMLElement ?? null;
+    return this.overlayContainerService.getContainer();
   }
 
   public readonly auth = inject(AuthService);

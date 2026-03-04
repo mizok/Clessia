@@ -75,6 +75,13 @@
         />
       </div>
 
+      @if (formValidationMessage()) {
+        <div class="form-dialog__error-inline">
+          <i class="pi pi-exclamation-triangle"></i>
+          <span>{{ formValidationMessage() }}</span>
+        </div>
+      }
+
       @if (scheduleEntries().length === 0) {
         <p class="form-dialog__empty-note">尚未設定上課時間，點擊「新增時段」添加</p>
       } @else {
@@ -115,20 +122,7 @@
                   [disabled]="loading()"
                 />
               </div>
-              <div class="schedule-entry__row schedule-entry__row--meta">
-                <p-select
-                  [options]="filteredStaffOptions()"
-                  [ngModel]="entry.teacherId"
-                  (ngModelChange)="updateScheduleEntry($index, 'teacherId', $event)"
-                  placeholder="待指派（選填）"
-                  [filter]="true"
-                  filterBy="label"
-                  [showClear]="true"
-                  [disabled]="loading()"
-                  [appendTo]="'body'"
-                  styleClass="schedule-entry__teacher"
-                />
-              </div>
+              <!-- teacher selection removed per D4: 老師指派改由行事曆批次操作處理 -->
             </div>
           }
         </div>

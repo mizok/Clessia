@@ -92,9 +92,13 @@
   &__expand-header {
     width: 48px;
     min-width: 48px;
-    padding: var(--space-2);
+    padding: var(--space-3) var(--space-2);
     border-bottom: 1px solid var(--zinc-200);
     background: color-mix(in srgb, var(--color-white) 90%, var(--accent-50));
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    vertical-align: middle;
   }
 
   &__expand-button {
@@ -229,6 +233,19 @@
     &__detail-item {
       grid-template-columns: minmax(74px, auto) minmax(0, 1fr);
       gap: var(--space-2);
+    }
+
+    &__paginator {
+      .p-paginator {
+        justify-content: center;
+        gap: var(--space-2);
+      }
+
+      .p-paginator-current {
+        margin-left: 0;
+        font-size: var(--text-sm);
+        color: var(--zinc-500);
+      }
     }
   }
 

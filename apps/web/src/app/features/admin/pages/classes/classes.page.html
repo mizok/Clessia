@@ -1,4 +1,5 @@
-<p-toast /> <p-confirmDialog [appendTo]="overlayContainer" />
+<p-toast appendTo="body" [baseZIndex]="25000" />
+<p-confirmDialog [appendTo]="overlayContainer" />
 <!-- 方法 1: 動態 Selector -->
 
 <div class="classes">
@@ -150,7 +151,7 @@
       } @else {
         <!-- Course Groups -->
         <div class="classes__groups">
-          @for (group of courseGroups(); track group.course.id) {
+          @for (group of paginatedCourseGroups(); track group.course.id) {
             <div class="course-group">
               <!-- Course Header -->
               <div
@@ -170,20 +171,31 @@
                       [class.pi-chevron-right]="isCourseCollapsed(group.course.id)"
                     ></i>
                     <i class="pi pi-book course-group__icon"></i>
-                    <span class="course-group__name">{{ group.course.name }}</span>
-                    <span class="course-group__campus">{{
-                      group.course.campusName ?? getCampusName(group.course.campusId)
-                    }}</span>
-                    <p-tag [value]="group.course.subjectName" severity="info" />
-                    @if (!group.course.isActive) {
-                      <p-tag value="已停用" severity="secondary" />
-                    }
+                    <div class="course-group__name-stack">
+                      <span class="course-group__name">
+                        {{ group.course.name }}
+                        @if (hasCourseNeedsIntervention(group)) {
+                          <i
+                            class="pi pi-exclamation-triangle course-group__intervention"
+                            [pTooltip]="getCourseInterventionTooltip(group)"
+                            tooltipPosition="top"
+                          ></i>
+                        }
+                      </span>
+                      <span class="course-group__campus-mobile">
+                        {{ group.course.campusName ?? getCampusName(group.course.campusId) }} ·
+                        {{ group.course.subjectName }}
+                        @if (!group.course.isActive) {
+                          · 已停用
+                        }
+                      </span>
+                    </div>
                   </div>
                   <span class="course-group__count">{{ group.classes.length }} 個班</span>
                 </div>
                 <div class="course-group__actions" (click)="$event.stopPropagation()">
                   <p-button
-                    label="新增班"
+                    [label]="isMobile() ? '' : '新增班'"
                     icon="pi pi-plus"
                     size="small"
                     [outlined]="true"
@@ -244,12 +256,15 @@
                           tabindex="0"
                           (keydown.enter)="openDetail(cls); $event.stopPropagation()"
                           pTooltip="點擊查看班級詳情"
+                          [tooltipPosition]="'top'"
                         >
+                          <i class="pi pi-info-circle"></i>
                           @if (cls.schedules && cls.schedules.length > 0) {
-                            <i class="pi pi-clock"></i>
-                            {{ getScheduleSummary(cls.schedules) }}
+                            <span class="schedule-text">{{
+                              getScheduleSummary(cls.schedules)
+                            }}</span>
                           } @else {
-                            <span class="class-row__no-schedule">尚無時間表</span>
+                            <span class="schedule-text class-row__no-schedule">尚無時間表</span>
                           }
                         </span>
                         @if (cls.maxStudents) {
@@ -272,14 +287,27 @@
                               <i class="pi pi-exclamation-triangle"></i>
                               無時段
                             </span>
+                          } @else if (
+                            cls.isActive &&
+                            !cls.hasUpcomingSessions &&
+                            (cls.upcomingCancelledCount ?? 0) > 0
+                          ) {
+                            <span
+                              class="class-row__completeness-info"
+                              pTooltip="未來課堂皆為停課狀態"
+                              tooltipPosition="top"
+                            >
+                              <i class="pi pi-calendar-times"></i>
+                              {{ isMobile() ? '皆停課' : '未來皆停課' }}
+                            </span>
                           } @else if (cls.isActive && !cls.hasUpcomingSessions) {
                             <span
                               class="class-row__completeness-info"
-                              pTooltip="尚未產生未來課堂"
+                              pTooltip="目前無未來排程（含今天）"
                               tooltipPosition="top"
                             >
                               <i class="pi pi-calendar-plus"></i>
-                              未排課
+                              {{ isMobile() ? '無排程' : '無未來排程' }}
                             </span>
                           }
                         </div>
@@ -294,7 +322,6 @@
                             (onClick)="
                               openActionMenu($event, cls, actionMenu); $event.stopPropagation()
                             "
-                            pTooltip="管理操作"
                           />
                         </div>
                       </div>
@@ -307,6 +334,26 @@
             </div>
           }
         </div>
+
+        @if (courseGroups().length > paginationRows()) {
+          <div class="classes__pagination">
+            <p-paginator
+              [first]="paginationFirst()"
+              [rows]="paginationRows()"
+              [totalRecords]="courseGroups().length"
+              [rowsPerPageOptions]="isMobile() ? undefined : paginationRowsPerPageOptions"
+              [showCurrentPageReport]="true"
+              [currentPageReportTemplate]="
+                isMobile()
+                  ? '第 {currentPage} / {totalPages} 頁'
+                  : '顯示 {first} - {last}，共 {totalRecords} 筆課程'
+              "
+              [showPageLinks]="!isMobile()"
+              [showFirstLastIcon]="!isMobile()"
+              (onPageChange)="onCoursePaginationChange($event)"
+            />
+          </div>
+        }
       }
     </div>
 
@@ -358,4 +405,4 @@
 </div>
 
 <!-- Class Action Menu -->
-<p-menu #actionMenu [model]="classActionMenuItems()" [popup]="true" />
+<p-menu #actionMenu [model]="classActionMenuItems()" [popup]="true" [appendTo]="'body'" />

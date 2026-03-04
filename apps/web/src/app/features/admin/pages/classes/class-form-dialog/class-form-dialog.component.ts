@@ -107,12 +107,15 @@ export class ClassFormDialogComponent {
 
   protected readonly pendingConflicts = signal<ScheduleConflict[]>([]);
   protected readonly conflictDialogVisible = signal(false);
+  protected readonly formValidationMessage = signal<string | null>(null);
 
   protected updateForm(field: keyof ReturnType<typeof this.formData>, value: any): void {
+    this.formValidationMessage.set(null);
     this.formData.update((f) => ({ ...f, [field]: value }));
   }
 
   protected addScheduleEntry(): void {
+    this.formValidationMessage.set(null);
     this.scheduleEntries.update((list) => [
       ...list,
       {
@@ -126,33 +129,48 @@ export class ClassFormDialogComponent {
   }
 
   protected removeScheduleEntry(index: number): void {
+    this.formValidationMessage.set(null);
     this.scheduleEntries.update((list) => list.filter((_, i) => i !== index));
   }
 
   protected updateScheduleEntry(index: number, field: keyof ScheduleFormEntry, value: any): void {
+    this.formValidationMessage.set(null);
     this.scheduleEntries.update((list) =>
       list.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry)),
     );
   }
 
   protected save(): void {
+    this.formValidationMessage.set(null);
     const form = this.formData();
     if (!form.name.trim()) {
-      this.messageService.add({ severity: 'warn', summary: '請填寫班級名稱' });
+      this.formValidationMessage.set('請填寫班級名稱');
       return;
     }
 
     const incompleteSchedule = this.scheduleEntries().find((e) => !e.weekday);
     if (incompleteSchedule) {
-      this.messageService.add({
-        severity: 'warn',
-        summary: '時段資料不完整',
-        detail: '請確認每個時段都已設定上課星期',
-      });
+      this.formValidationMessage.set('時段資料不完整：請確認每個時段都已設定上課星期');
       return;
     }
 
-    // Conflict check for NEW schedules
+    const invalidTime = this.scheduleEntries().find(
+      (entry) => !entry.startTime || !entry.endTime || entry.startTime >= entry.endTime,
+    );
+    if (invalidTime) {
+      this.formValidationMessage.set('時段資料不合法：請確認每個時段的開始時間早於結束時間');
+      return;
+    }
+
+    const overlap = this.findLocalScheduleOverlap(this.scheduleEntries());
+    if (overlap) {
+      this.formValidationMessage.set(
+        `時段重疊：第 ${overlap.firstEntryNo} 筆與第 ${overlap.secondEntryNo} 筆在${this.getWeekdayLabel(overlap.weekday)}時段重疊`,
+      );
+      return;
+    }
+
+    // Conflict check for NEW schedules (only when teacherId is set)
     const toCheck: CheckConflictScheduleInput[] = this.scheduleEntries()
       .filter((e) => !e.id && !!e.teacherId && !!e.weekday)
       .map((e) => ({
@@ -164,6 +182,7 @@ export class ClassFormDialogComponent {
       }));
 
     if (toCheck.length === 0) {
+      // No teacher assigned — skip conflict check, go directly to save
       this.doSave();
       return;
     }
@@ -251,15 +270,24 @@ export class ClassFormDialogComponent {
       this.classesService.deleteSchedule(classId, sid).toPromise(),
     );
 
-    Promise.all(deleteOps).then(() => {
-      if (toAdd.length === 0) {
-        this.ref.close({ classId });
-      } else {
-        this.addSchedulesSequentially(classId, toAdd, 0, () => {
+    Promise.all(deleteOps)
+      .then(() => {
+        if (toAdd.length === 0) {
           this.ref.close({ classId });
+        } else {
+          this.addSchedulesSequentially(classId, toAdd, 0, () => {
+            this.ref.close({ classId });
+          });
+        }
+      })
+      .catch((err) => {
+        this.loading.set(false);
+        this.messageService.add({
+          severity: 'error',
+          summary: '儲存失敗',
+          detail: err?.error?.error || '更新時段失敗，請稍後再試',
         });
-      }
-    });
+      });
   }
 
   private addSchedulesSequentially(
@@ -282,8 +310,41 @@ export class ClassFormDialogComponent {
     };
     this.classesService.addSchedule(classId, input).subscribe({
       next: () => this.addSchedulesSequentially(classId, entries, index + 1, onComplete),
-      error: () => this.addSchedulesSequentially(classId, entries, index + 1, onComplete),
+      error: (err) => {
+        this.loading.set(false);
+        this.messageService.add({
+          severity: 'error',
+          summary: '儲存失敗',
+          detail: err?.error?.error || '新增時段失敗，請確認是否存在重疊時段',
+        });
+      },
     });
+  }
+
+  private findLocalScheduleOverlap(entries: ScheduleFormEntry[]): {
+    firstEntryNo: number;
+    secondEntryNo: number;
+    weekday: number;
+  } | null {
+    for (let i = 0; i < entries.length; i++) {
+      const left = entries[i];
+      if (!left.weekday) continue;
+
+      for (let j = i + 1; j < entries.length; j++) {
+        const right = entries[j];
+        if (!right.weekday || left.weekday !== right.weekday) continue;
+
+        const isOverlap = left.startTime < right.endTime && right.startTime < left.endTime;
+        if (isOverlap) {
+          return {
+            firstEntryNo: i + 1,
+            secondEntryNo: j + 1,
+            weekday: left.weekday,
+          };
+        }
+      }
+    }
+    return null;
   }
 
   protected cancel(): void {

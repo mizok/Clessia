@@ -6,7 +6,7 @@
   <div class="cal__header">
     <div class="cal__title-group">
       <h1 class="cal__title">課堂行事曆</h1>
-      <button class="cal__subtitle" (click)="toggleDatePicker()">
+      <button #subtitleButton class="cal__subtitle" (click)="toggleDatePicker()">
         @if (isWeekView()) {
           {{ weekLabel() }}
         } @else {
@@ -15,7 +15,7 @@
         <i class="pi pi-angle-down cal__subtitle-caret"></i>
       </button>
       @if (showDatePicker()) {
-        <div class="cal__datepicker-popup">
+        <div #datepickerPopup class="cal__datepicker-popup">
           <p-datepicker
             [ngModel]="currentDate()"
             [inline]="true"

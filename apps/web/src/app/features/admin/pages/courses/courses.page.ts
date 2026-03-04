@@ -28,9 +28,8 @@ import {
 } from '@core/courses.service';
 import { CampusesService, Campus } from '@core/campuses.service';
 import { SubjectsService, Subject } from '@core/subjects.service';
-import { OverlayContainerDirective } from '@shared/directives/overlay-container.directive';
+import { OverlayContainerService } from '@core/overlay-container.service';
 
-// Shared
 import { EmptyStateComponent } from '@shared/components/empty-state/empty-state.component';
 import { SubjectManagerComponent } from '@shared/components/subject-manager/subject-manager.component';
 
@@ -75,11 +74,9 @@ export class CoursesPage implements OnInit {
   private readonly subjectsService = inject(SubjectsService);
   private readonly messageService = inject(MessageService);
   private readonly confirmationService = inject(ConfirmationService);
-  private readonly overlayContainerDirective = inject(OverlayContainerDirective, {
-    optional: true,
-  });
+  private readonly overlayContainerService = inject(OverlayContainerService);
   protected get overlayContainer(): HTMLElement | null {
-    return this.overlayContainerDirective?.nativeHTMLElement ?? null;
+    return this.overlayContainerService.getContainer();
   }
 
   // State

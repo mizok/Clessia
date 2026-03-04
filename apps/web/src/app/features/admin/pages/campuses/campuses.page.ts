@@ -16,11 +16,11 @@ import {
   CreateCampusInput,
   UpdateCampusInput,
 } from '@core/campuses.service';
+import { OverlayContainerService } from '@core/overlay-container.service';
 
 // Shared
 import { EmptyStateComponent } from '@shared/components/empty-state/empty-state.component';
 import { AuditLogDialogComponent } from '@shared/components/audit-log-dialog/audit-log-dialog.component';
-import { OverlayContainerDirective } from '@shared/directives/overlay-container.directive';
 
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
@@ -58,11 +58,9 @@ export class CampusesPage implements OnInit {
   private readonly messageService = inject(MessageService);
   private readonly confirmationService = inject(ConfirmationService);
   private readonly dialogService = inject(DialogService);
-  private readonly overlayContainerDirective = inject(OverlayContainerDirective, {
-    optional: true,
-  });
+  private readonly overlayContainerService = inject(OverlayContainerService);
   protected get overlayContainer(): HTMLElement | null {
-    return this.overlayContainerDirective?.nativeHTMLElement ?? null;
+    return this.overlayContainerService.getContainer();
   }
 
   // State

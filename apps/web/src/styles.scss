@@ -268,7 +268,7 @@ select {
    ============================================================================= */
 .p-toast {
   opacity: 1;
-  z-index: 9999 !important;
+  z-index: 25000 !important;
   top: calc(var(--app-header-height, 0px) + 20px) !important;
 
   .p-toast-message {
@@ -516,6 +516,12 @@ select {
     @include bp.respond-to('mobile') {
       padding: var(--space-4);
     }
+  }
+
+  &__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
 
   &__field {
@@ -817,4 +823,225 @@ textarea.p-textarea,
 
 .u-scrollable {
   overflow: auto;
+}
+
+/* =============================================================================
+   Calendar Dialog Styles (extracted)
+   ============================================================================= */
+.cal-dialog {
+  .p-dialog-header {
+    padding: var(--space-5) var(--space-6);
+    border-bottom: 1px solid var(--zinc-100);
+
+    .p-dialog-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-semibold);
+      color: var(--zinc-900);
+    }
+  }
+
+  .p-dialog-footer {
+    padding: var(--space-4) var(--space-6);
+    border-top: 1px solid var(--zinc-100);
+    background: var(--zinc-50);
+  }
+}
+
+// =============================================================================
+// Detail Popup
+// =============================================================================
+
+.cal-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+
+    + .cal-detail__section {
+      border-top: 1px solid var(--zinc-100);
+      padding-top: var(--space-4);
+    }
+  }
+
+  &__section-title {
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    color: var(--zinc-500);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: var(--text-base);
+    color: var(--zinc-700);
+  }
+
+  &__icon {
+    font-size: 14px;
+    color: var(--zinc-400);
+    flex-shrink: 0;
+    width: 16px;
+    text-align: center;
+  }
+
+  &__change {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--zinc-50);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--zinc-100);
+  }
+
+  &__change-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: var(--text-sm);
+    color: var(--zinc-700);
+    min-width: 0;
+    flex: 1;
+  }
+
+  &__reason {
+    color: var(--zinc-500);
+    font-style: italic;
+  }
+
+  &__by {
+    font-size: var(--text-xs);
+    color: var(--zinc-400);
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+
+    // Push close button to the right
+    > p-button:last-child {
+      margin-left: auto;
+    }
+  }
+}
+
+// =============================================================================
+// Operation Forms (Cancel / Substitute / Reschedule dialogs)
+// =============================================================================
+
+.cal-op-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+
+  &__warning {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    background: var(--warning-100);
+    border-radius: var(--radius-md);
+    border: 1px solid #fde68a;
+    font-size: var(--text-sm);
+    color: #92400e;
+    line-height: var(--leading-relaxed);
+
+    i {
+      color: var(--warning-600);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    flex: 1;
+  }
+
+  &__row {
+    display: flex;
+    gap: var(--space-3);
+  }
+
+  &__label {
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    color: var(--zinc-700);
+  }
+
+  &__required {
+    color: var(--error-600);
+    margin-left: 2px;
+  }
+
+  &__textarea {
+    width: 100%;
+    resize: vertical;
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-md);
+    line-height: var(--leading-normal);
+    min-height: 72px;
+  }
+
+  &__time {
+    width: 100%;
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--zinc-100);
+  }
+}
+
+// =============================================================================
+
+@include bp.respond-to('tablet-portrait') {
+  .p-paginator {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .p-paginator .p-paginator-pages,
+  .p-paginator .p-paginator-first,
+  .p-paginator .p-paginator-last,
+  .p-paginator .p-paginator-rpp-dropdown,
+  .p-paginator .p-paginator-jtp-dropdown,
+  .p-paginator .p-paginator-jtp-input {
+    display: none !important;
+  }
+
+  .p-paginator .p-paginator-current {
+    margin-left: 0;
+    white-space: nowrap;
+    font-size: var(--text-sm);
+    color: var(--zinc-500);
+  }
+
+  .cal-op-form {
+    &__row {
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+  }
 }

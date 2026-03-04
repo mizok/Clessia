@@ -38,6 +38,11 @@ const ClassSchema = z
     scheduleCount: z.number().optional(),
     scheduleTeacherIds: z.array(z.string()).optional(),
     hasUpcomingSessions: z.boolean().optional(),
+    hasAnySessions: z.boolean().optional(),
+    upcomingCancelledCount: z.number().optional(),
+    upcomingUnassignedCount: z.number().optional(),
+    upcomingClassConflictCount: z.number().optional(),
+    upcomingTeacherConflictCount: z.number().optional(),
     schedules: z.array(ScheduleSchema).optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
@@ -125,6 +130,40 @@ const BatchAssignConflictSchema = z.object({
   conflictWithSessionId: z.uuid(),
 });
 
+const BatchSessionTargetSchema = z.object({
+  sessionIds: z.array(z.uuid()).min(1).max(1000),
+  dryRun: z.boolean().optional(),
+});
+
+const BatchUpdateSessionTimeBodySchema = BatchSessionTargetSchema.extend({
+  startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+});
+
+const BatchCancelSessionsBodySchema = BatchSessionTargetSchema;
+
+const BatchSessionConflictSchema = z.object({
+  sessionId: z.uuid(),
+  sessionDate: z.string(),
+  reason: z.enum([
+    'status_not_editable',
+    'status_not_cancellable',
+    'status_not_reopenable',
+    'class_conflict',
+    'teacher_conflict',
+  ]),
+  detail: z.string(),
+  conflictingSessionId: z.uuid().optional(),
+});
+
+const BatchSessionActionResponseSchema = z.object({
+  updated: z.number(),
+  skipped: z.number(),
+  processableIds: z.array(z.uuid()),
+  conflicts: z.array(BatchSessionConflictSchema),
+  dryRun: z.boolean(),
+});
+
 const GenerateSessionsResponseSchema = z.object({
   createdAssigned: z.number(),
   createdUnassigned: z.number(),
@@ -199,6 +238,11 @@ interface ClassExtras {
   scheduleCount?: number;
   scheduleTeacherIds?: string[];
   hasUpcomingSessions?: boolean;
+  hasAnySessions?: boolean;
+  upcomingCancelledCount?: number;
+  upcomingUnassignedCount?: number;
+  upcomingClassConflictCount?: number;
+  upcomingTeacherConflictCount?: number;
   updatedByName?: string | null;
 }
 
@@ -217,6 +261,11 @@ function mapClass(row: Record<string, unknown>, extras?: ClassExtras) {
     scheduleCount: extras?.scheduleCount,
     scheduleTeacherIds: extras?.scheduleTeacherIds,
     hasUpcomingSessions: extras?.hasUpcomingSessions,
+    hasAnySessions: extras?.hasAnySessions,
+    upcomingCancelledCount: extras?.upcomingCancelledCount,
+    upcomingUnassignedCount: extras?.upcomingUnassignedCount,
+    upcomingClassConflictCount: extras?.upcomingClassConflictCount,
+    upcomingTeacherConflictCount: extras?.upcomingTeacherConflictCount,
     schedules: extras?.schedules?.map((s) => mapSchedule(s as Record<string, unknown>)),
     createdAt: row['created_at'] as string,
     updatedAt: row['updated_at'] as string,
@@ -243,6 +292,21 @@ function toMinutes(value: string): number {
 
 function isTimeOverlap(startA: string, endA: string, startB: string, endB: string): boolean {
   return toMinutes(startA) < toMinutes(endB) && toMinutes(startB) < toMinutes(endA);
+}
+
+type BatchSessionConflictReason =
+  | 'status_not_editable'
+  | 'status_not_cancellable'
+  | 'status_not_reopenable'
+  | 'class_conflict'
+  | 'teacher_conflict';
+
+interface BatchSessionConflictItem {
+  readonly sessionId: string;
+  readonly sessionDate: string;
+  readonly reason: BatchSessionConflictReason;
+  readonly detail: string;
+  readonly conflictingSessionId?: string;
 }
 
 // ============================================================
@@ -298,17 +362,123 @@ app.openapi(
     const scheduleCountMap: Record<string, number> = {};
     const scheduleTeacherMap: Record<string, string[]> = {};
     const hasUpcomingSet = new Set<string>();
+    const hasAnySessionSet = new Set<string>();
+    const upcomingCancelledCountMap: Record<string, number> = {};
+    const upcomingUnassignedCountMap: Record<string, number> = {};
+    const upcomingClassConflictCountMap: Record<string, number> = {};
+    const upcomingTeacherConflictCountMap: Record<string, number> = {};
 
     if (classIds.length > 0) {
       const sessionsResult = await supabase
         .from('sessions')
-        .select('class_id')
+        .select('id, class_id, session_date, start_time, end_time, teacher_id')
         .in('class_id', classIds)
         .gte('session_date', new Date().toISOString().split('T')[0])
         .eq('status', 'scheduled');
 
       for (const s of sessionsResult.data || []) {
-        hasUpcomingSet.add(s.class_id as string);
+        const classId = s.class_id as string;
+        hasUpcomingSet.add(classId);
+        if (!s.teacher_id) {
+          upcomingUnassignedCountMap[classId] = (upcomingUnassignedCountMap[classId] ?? 0) + 1;
+        }
+      }
+
+      const upcomingSessions =
+        (sessionsResult.data as
+          | Array<{
+              id: string;
+              class_id: string;
+              session_date: string;
+              start_time: string;
+              end_time: string;
+              teacher_id: string | null;
+            }>
+          | null) ?? [];
+
+      const classDateBuckets = new Map<string, typeof upcomingSessions>();
+      for (const session of upcomingSessions) {
+        const bucketKey = `${session.class_id}|${session.session_date}`;
+        const bucket = classDateBuckets.get(bucketKey) ?? [];
+        bucket.push(session);
+        classDateBuckets.set(bucketKey, bucket);
+      }
+
+      for (const sessions of classDateBuckets.values()) {
+        sessions.sort((a, b) => toMinutes(a.start_time) - toMinutes(b.start_time));
+        for (let i = 0; i < sessions.length; i++) {
+          for (let j = i + 1; j < sessions.length; j++) {
+            if (
+              isTimeOverlap(
+                normalizeTime(sessions[i].start_time),
+                normalizeTime(sessions[i].end_time),
+                normalizeTime(sessions[j].start_time),
+                normalizeTime(sessions[j].end_time),
+              )
+            ) {
+              const classId = sessions[i].class_id;
+              upcomingClassConflictCountMap[classId] =
+                (upcomingClassConflictCountMap[classId] ?? 0) + 1;
+            } else {
+              break;
+            }
+          }
+        }
+      }
+
+      const teacherDateBuckets = new Map<string, typeof upcomingSessions>();
+      for (const session of upcomingSessions) {
+        if (!session.teacher_id) continue;
+        const bucketKey = `${session.teacher_id}|${session.session_date}`;
+        const bucket = teacherDateBuckets.get(bucketKey) ?? [];
+        bucket.push(session);
+        teacherDateBuckets.set(bucketKey, bucket);
+      }
+
+      for (const sessions of teacherDateBuckets.values()) {
+        sessions.sort((a, b) => toMinutes(a.start_time) - toMinutes(b.start_time));
+        for (let i = 0; i < sessions.length; i++) {
+          for (let j = i + 1; j < sessions.length; j++) {
+            if (
+              isTimeOverlap(
+                normalizeTime(sessions[i].start_time),
+                normalizeTime(sessions[i].end_time),
+                normalizeTime(sessions[j].start_time),
+                normalizeTime(sessions[j].end_time),
+              )
+            ) {
+              const classIdA = sessions[i].class_id;
+              const classIdB = sessions[j].class_id;
+              upcomingTeacherConflictCountMap[classIdA] =
+                (upcomingTeacherConflictCountMap[classIdA] ?? 0) + 1;
+              upcomingTeacherConflictCountMap[classIdB] =
+                (upcomingTeacherConflictCountMap[classIdB] ?? 0) + 1;
+            } else {
+              break;
+            }
+          }
+        }
+      }
+
+      const anySessionsResult = await supabase
+        .from('sessions')
+        .select('class_id')
+        .in('class_id', classIds);
+
+      for (const s of anySessionsResult.data || []) {
+        hasAnySessionSet.add(s.class_id as string);
+      }
+
+      const upcomingCancelledResult = await supabase
+        .from('sessions')
+        .select('class_id')
+        .in('class_id', classIds)
+        .gte('session_date', new Date().toISOString().split('T')[0])
+        .eq('status', 'cancelled');
+
+      for (const s of upcomingCancelledResult.data || []) {
+        const classId = s.class_id as string;
+        upcomingCancelledCountMap[classId] = (upcomingCancelledCountMap[classId] ?? 0) + 1;
       }
     }
 
@@ -323,6 +493,11 @@ app.openapi(
             .map((s: any) => s.teacher_id)
             .filter((tid): tid is string => !!tid),
           hasUpcomingSessions: hasUpcomingSet.has(id),
+          hasAnySessions: hasAnySessionSet.has(id),
+          upcomingCancelledCount: upcomingCancelledCountMap[id] ?? 0,
+          upcomingUnassignedCount: upcomingUnassignedCountMap[id] ?? 0,
+          upcomingClassConflictCount: upcomingClassConflictCountMap[id] ?? 0,
+          upcomingTeacherConflictCount: upcomingTeacherConflictCountMap[id] ?? 0,
         });
       }),
       meta: {
@@ -690,7 +865,7 @@ app.openapi(
 
     if (error) {
       if (error.code === '23505') {
-        return c.json({ error: '此分校已有同名班級', code: 'DUPLICATE' }, 409);
+        return c.json({ error: '此課程已有同名班級', code: 'DUPLICATE' }, 409);
       }
       return c.json({ error: error.message, code: 'DB_ERROR' }, 400);
     }
@@ -1499,6 +1674,682 @@ app.openapi(
         skippedConflicts: plan.skippedConflicts,
         skippedNotEligible: plan.skippedNotEligible,
         conflicts: plan.conflicts,
+        dryRun,
+      },
+      200,
+    );
+  },
+);
+
+// PATCH /api/classes/:id/sessions/batch-update-time
+app.openapi(
+  createRoute({
+    method: 'patch',
+    path: '/{id}/sessions/batch-update-time',
+    tags: ['Classes'],
+    summary: '批次修改課堂時間（固定略過衝突）',
+    request: {
+      params: z.object({ id: z.uuid() }),
+      body: { content: { 'application/json': { schema: BatchUpdateSessionTimeBodySchema } } },
+    },
+    responses: {
+      200: {
+        description: '成功',
+        content: { 'application/json': { schema: BatchSessionActionResponseSchema } },
+      },
+      404: {
+        description: '班級不存在',
+        content: { 'application/json': { schema: ErrorSchema } },
+      },
+      400: {
+        description: '參數或資料錯誤',
+        content: { 'application/json': { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c) => {
+    const supabase = c.get('supabase');
+    const orgId = c.get('orgId');
+    const userId = c.get('userId');
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+
+    const uniqueSessionIds = [...new Set(body.sessionIds)];
+    const dryRun = body.dryRun ?? true;
+    const newStartTime = normalizeTime(body.startTime);
+    const newEndTime = normalizeTime(body.endTime);
+
+    if (toMinutes(newStartTime) >= toMinutes(newEndTime)) {
+      return c.json({ error: '開始時間需早於結束時間', code: 'INVALID_TIME_RANGE' }, 400);
+    }
+
+    const { data: cls } = await supabase
+      .from('classes')
+      .select('id, name')
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .maybeSingle();
+
+    if (!cls) {
+      return c.json({ error: '班級不存在', code: 'NOT_FOUND' }, 404);
+    }
+
+    const { data: sessionRows, error: sessionRowsError } = await supabase
+      .from('sessions')
+      .select('id, session_date, start_time, end_time, status, teacher_id')
+      .eq('org_id', orgId)
+      .eq('class_id', id)
+      .in('id', uniqueSessionIds);
+
+    if (sessionRowsError) {
+      return c.json({ error: sessionRowsError.message, code: 'DB_ERROR' }, 400);
+    }
+
+    const targetSessions = (sessionRows ?? []) as Array<{
+      id: string;
+      session_date: string;
+      start_time: string;
+      end_time: string;
+      status: 'scheduled' | 'completed' | 'cancelled';
+      teacher_id: string | null;
+    }>;
+
+    if (targetSessions.length === 0) {
+      return c.json(
+        {
+          updated: 0,
+          skipped: uniqueSessionIds.length,
+          processableIds: [],
+          conflicts: [],
+          dryRun,
+        },
+        200,
+      );
+    }
+
+    const targetDates = [...new Set(targetSessions.map((session) => session.session_date))];
+    const targetTeacherIds = [
+      ...new Set(
+        targetSessions
+          .map((session) => session.teacher_id)
+          .filter((teacherId): teacherId is string => !!teacherId),
+      ),
+    ];
+
+    const { data: classDateSessions, error: classDateSessionsError } = await supabase
+      .from('sessions')
+      .select('id, session_date, start_time, end_time, status, teacher_id')
+      .eq('org_id', orgId)
+      .eq('class_id', id)
+      .eq('status', 'scheduled')
+      .in('session_date', targetDates);
+
+    if (classDateSessionsError) {
+      return c.json({ error: classDateSessionsError.message, code: 'DB_ERROR' }, 400);
+    }
+
+    const teacherDateSessionsResult =
+      targetTeacherIds.length === 0
+        ? { data: [], error: null }
+        : await supabase
+            .from('sessions')
+            .select('id, session_date, start_time, end_time, status, teacher_id')
+            .eq('org_id', orgId)
+            .eq('status', 'scheduled')
+            .in('teacher_id', targetTeacherIds)
+            .in('session_date', targetDates);
+
+    if (teacherDateSessionsResult.error) {
+      return c.json({ error: teacherDateSessionsResult.error.message, code: 'DB_ERROR' }, 400);
+    }
+
+    const classPeers = (classDateSessions ?? []) as Array<{
+      id: string;
+      session_date: string;
+      start_time: string;
+      end_time: string;
+    }>;
+    const teacherPeers = (teacherDateSessionsResult.data ?? []) as Array<{
+      id: string;
+      session_date: string;
+      start_time: string;
+      end_time: string;
+      teacher_id: string | null;
+    }>;
+
+    const conflicts: BatchSessionConflictItem[] = [];
+    const processableIds: string[] = [];
+
+    for (const target of targetSessions) {
+      if (target.status !== 'scheduled') {
+        conflicts.push({
+          sessionId: target.id,
+          sessionDate: target.session_date,
+          reason: 'status_not_editable',
+          detail: '僅可修改狀態為「scheduled」的課堂',
+        });
+        continue;
+      }
+
+      const classConflict = classPeers.find(
+        (peer) =>
+          peer.id !== target.id &&
+          peer.session_date === target.session_date &&
+          isTimeOverlap(newStartTime, newEndTime, normalizeTime(peer.start_time), normalizeTime(peer.end_time)),
+      );
+
+      if (classConflict) {
+        conflicts.push({
+          sessionId: target.id,
+          sessionDate: target.session_date,
+          reason: 'class_conflict',
+          detail: '同班級於此時段已有課堂',
+          conflictingSessionId: classConflict.id,
+        });
+        continue;
+      }
+
+      if (target.teacher_id) {
+        const teacherConflict = teacherPeers.find(
+          (peer) =>
+            peer.id !== target.id &&
+            peer.teacher_id === target.teacher_id &&
+            peer.session_date === target.session_date &&
+            isTimeOverlap(newStartTime, newEndTime, normalizeTime(peer.start_time), normalizeTime(peer.end_time)),
+        );
+
+        if (teacherConflict) {
+          conflicts.push({
+            sessionId: target.id,
+            sessionDate: target.session_date,
+            reason: 'teacher_conflict',
+            detail: '老師於此時段已有其他課堂',
+            conflictingSessionId: teacherConflict.id,
+          });
+          continue;
+        }
+      }
+
+      processableIds.push(target.id);
+    }
+
+    const missingCount = uniqueSessionIds.length - targetSessions.length;
+    const updated = processableIds.length;
+    const skipped = conflicts.length + missingCount;
+
+    if (!dryRun && updated > 0) {
+      const { error: updateError } = await supabase
+        .from('sessions')
+        .update({ start_time: newStartTime, end_time: newEndTime })
+        .eq('org_id', orgId)
+        .eq('class_id', id)
+        .in('id', processableIds);
+
+      if (updateError) {
+        return c.json({ error: updateError.message, code: 'DB_ERROR' }, 400);
+      }
+
+      const targetSessionDateMap = new Map(
+        targetSessions.map((session) => [session.id, session.session_date]),
+      );
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', userId)
+        .maybeSingle();
+
+      const { error: insertChangeError } = await supabase.from('schedule_changes').insert(
+        processableIds.map((sessionId) => ({
+          org_id: orgId,
+          session_id: sessionId,
+          change_type: 'reschedule',
+          new_session_date: targetSessionDateMap.get(sessionId) ?? null,
+          new_start_time: newStartTime,
+          new_end_time: newEndTime,
+          reason: '批次改時間',
+          created_by_name: profile?.display_name ?? null,
+        })),
+      );
+
+      if (insertChangeError) {
+        return c.json({ error: insertChangeError.message, code: 'DB_ERROR' }, 400);
+      }
+
+      logAudit(
+        supabase,
+        {
+          orgId,
+          userId,
+          resourceType: 'class',
+          resourceId: id,
+          resourceName: (cls.name as string | null) ?? null,
+          action: 'batch_update_session_time',
+          details: {
+            requested: uniqueSessionIds.length,
+            updated,
+            skipped,
+            startTime: newStartTime,
+            endTime: newEndTime,
+          },
+        },
+        c.executionCtx.waitUntil.bind(c.executionCtx),
+      );
+    }
+
+    return c.json(
+      {
+        updated,
+        skipped,
+        processableIds,
+        conflicts,
+        dryRun,
+      },
+      200,
+    );
+  },
+);
+
+// PATCH /api/classes/:id/sessions/batch-cancel
+app.openapi(
+  createRoute({
+    method: 'patch',
+    path: '/{id}/sessions/batch-cancel',
+    tags: ['Classes'],
+    summary: '批次停課（固定略過不可停課項目）',
+    request: {
+      params: z.object({ id: z.uuid() }),
+      body: { content: { 'application/json': { schema: BatchCancelSessionsBodySchema } } },
+    },
+    responses: {
+      200: {
+        description: '成功',
+        content: { 'application/json': { schema: BatchSessionActionResponseSchema } },
+      },
+      404: {
+        description: '班級不存在',
+        content: { 'application/json': { schema: ErrorSchema } },
+      },
+      400: {
+        description: '參數或資料錯誤',
+        content: { 'application/json': { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c) => {
+    const supabase = c.get('supabase');
+    const orgId = c.get('orgId');
+    const userId = c.get('userId');
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+
+    const uniqueSessionIds = [...new Set(body.sessionIds)];
+    const dryRun = body.dryRun ?? true;
+
+    const { data: cls } = await supabase
+      .from('classes')
+      .select('id, name')
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .maybeSingle();
+
+    if (!cls) {
+      return c.json({ error: '班級不存在', code: 'NOT_FOUND' }, 404);
+    }
+
+    const { data: sessionRows, error: sessionRowsError } = await supabase
+      .from('sessions')
+      .select('id, session_date, status')
+      .eq('org_id', orgId)
+      .eq('class_id', id)
+      .in('id', uniqueSessionIds);
+
+    if (sessionRowsError) {
+      return c.json({ error: sessionRowsError.message, code: 'DB_ERROR' }, 400);
+    }
+
+    const targetSessions = (sessionRows ?? []) as Array<{
+      id: string;
+      session_date: string;
+      status: 'scheduled' | 'completed' | 'cancelled';
+    }>;
+
+    if (targetSessions.length === 0) {
+      return c.json(
+        {
+          updated: 0,
+          skipped: uniqueSessionIds.length,
+          processableIds: [],
+          conflicts: [],
+          dryRun,
+        },
+        200,
+      );
+    }
+
+    const conflicts: BatchSessionConflictItem[] = [];
+    const processableIds: string[] = [];
+
+    for (const target of targetSessions) {
+      if (target.status !== 'scheduled') {
+        conflicts.push({
+          sessionId: target.id,
+          sessionDate: target.session_date,
+          reason: 'status_not_cancellable',
+          detail: '僅可停課狀態為「scheduled」的課堂',
+        });
+        continue;
+      }
+      processableIds.push(target.id);
+    }
+
+    const missingCount = uniqueSessionIds.length - targetSessions.length;
+    const updated = processableIds.length;
+    const skipped = conflicts.length + missingCount;
+
+    if (!dryRun && updated > 0) {
+      const { error: cancelError } = await supabase
+        .from('sessions')
+        .update({ status: 'cancelled' })
+        .eq('org_id', orgId)
+        .eq('class_id', id)
+        .in('id', processableIds);
+
+      if (cancelError) {
+        return c.json({ error: cancelError.message, code: 'DB_ERROR' }, 400);
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', userId)
+        .maybeSingle();
+
+      const { error: insertChangeError } = await supabase.from('schedule_changes').insert(
+        processableIds.map((sessionId) => ({
+          org_id: orgId,
+          session_id: sessionId,
+          change_type: 'cancellation',
+          reason: '批次停課',
+          created_by_name: profile?.display_name ?? null,
+        })),
+      );
+
+      if (insertChangeError) {
+        return c.json({ error: insertChangeError.message, code: 'DB_ERROR' }, 400);
+      }
+
+      logAudit(
+        supabase,
+        {
+          orgId,
+          userId,
+          resourceType: 'class',
+          resourceId: id,
+          resourceName: (cls.name as string | null) ?? null,
+          action: 'batch_cancel_session',
+          details: {
+            requested: uniqueSessionIds.length,
+            updated,
+            skipped,
+          },
+        },
+        c.executionCtx.waitUntil.bind(c.executionCtx),
+      );
+    }
+
+    return c.json(
+      {
+        updated,
+        skipped,
+        processableIds,
+        conflicts,
+        dryRun,
+      },
+      200,
+    );
+  },
+);
+
+// PATCH /api/classes/:id/sessions/batch-uncancel
+app.openapi(
+  createRoute({
+    method: 'patch',
+    path: '/{id}/sessions/batch-uncancel',
+    tags: ['Classes'],
+    summary: '批次取消停課（恢復為已排定，固定略過衝突）',
+    request: {
+      params: z.object({ id: z.uuid() }),
+      body: { content: { 'application/json': { schema: BatchCancelSessionsBodySchema } } },
+    },
+    responses: {
+      200: {
+        description: '成功',
+        content: { 'application/json': { schema: BatchSessionActionResponseSchema } },
+      },
+      404: {
+        description: '班級不存在',
+        content: { 'application/json': { schema: ErrorSchema } },
+      },
+      400: {
+        description: '參數或資料錯誤',
+        content: { 'application/json': { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c) => {
+    const supabase = c.get('supabase');
+    const orgId = c.get('orgId');
+    const userId = c.get('userId');
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+
+    const uniqueSessionIds = [...new Set(body.sessionIds)];
+    const dryRun = body.dryRun ?? true;
+
+    const { data: cls } = await supabase
+      .from('classes')
+      .select('id, name')
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .maybeSingle();
+
+    if (!cls) {
+      return c.json({ error: '班級不存在', code: 'NOT_FOUND' }, 404);
+    }
+
+    const { data: sessionRows, error: sessionRowsError } = await supabase
+      .from('sessions')
+      .select('id, class_id, session_date, start_time, end_time, status, teacher_id')
+      .eq('org_id', orgId)
+      .eq('class_id', id)
+      .in('id', uniqueSessionIds);
+
+    if (sessionRowsError) {
+      return c.json({ error: sessionRowsError.message, code: 'DB_ERROR' }, 400);
+    }
+
+    const targetSessions = (sessionRows ?? []) as Array<{
+      id: string;
+      class_id: string;
+      session_date: string;
+      start_time: string;
+      end_time: string;
+      status: 'scheduled' | 'completed' | 'cancelled';
+      teacher_id: string | null;
+    }>;
+
+    if (targetSessions.length === 0) {
+      return c.json(
+        {
+          updated: 0,
+          skipped: uniqueSessionIds.length,
+          processableIds: [],
+          conflicts: [],
+          dryRun,
+        },
+        200,
+      );
+    }
+
+    const targetDates = [...new Set(targetSessions.map((session) => session.session_date))];
+    const targetTeacherIds = [
+      ...new Set(
+        targetSessions
+          .map((session) => session.teacher_id)
+          .filter((teacherId): teacherId is string => !!teacherId),
+      ),
+    ];
+
+    const { data: classDateSessions, error: classDateSessionsError } = await supabase
+      .from('sessions')
+      .select('id, class_id, session_date, start_time, end_time, status, teacher_id')
+      .eq('org_id', orgId)
+      .eq('class_id', id)
+      .eq('status', 'scheduled')
+      .in('session_date', targetDates);
+
+    if (classDateSessionsError) {
+      return c.json({ error: classDateSessionsError.message, code: 'DB_ERROR' }, 400);
+    }
+
+    const teacherDateSessionsResult =
+      targetTeacherIds.length === 0
+        ? { data: [], error: null }
+        : await supabase
+            .from('sessions')
+            .select('id, session_date, start_time, end_time, status, teacher_id')
+            .eq('org_id', orgId)
+            .eq('status', 'scheduled')
+            .in('teacher_id', targetTeacherIds)
+            .in('session_date', targetDates);
+
+    if (teacherDateSessionsResult.error) {
+      return c.json({ error: teacherDateSessionsResult.error.message, code: 'DB_ERROR' }, 400);
+    }
+
+    const classPeers = (classDateSessions ?? []) as Array<{
+      id: string;
+      session_date: string;
+      start_time: string;
+      end_time: string;
+    }>;
+    const teacherPeers = (teacherDateSessionsResult.data ?? []) as Array<{
+      id: string;
+      session_date: string;
+      start_time: string;
+      end_time: string;
+      teacher_id: string | null;
+    }>;
+
+    const conflicts: BatchSessionConflictItem[] = [];
+    const processableIds: string[] = [];
+
+    for (const target of targetSessions) {
+      if (target.status !== 'cancelled') {
+        conflicts.push({
+          sessionId: target.id,
+          sessionDate: target.session_date,
+          reason: 'status_not_reopenable',
+          detail: '僅可取消已停課（cancelled）的課堂',
+        });
+        continue;
+      }
+
+      const targetStart = normalizeTime(target.start_time);
+      const targetEnd = normalizeTime(target.end_time);
+
+      const classConflict = classPeers.find(
+        (peer) =>
+          peer.session_date === target.session_date &&
+          isTimeOverlap(
+            targetStart,
+            targetEnd,
+            normalizeTime(peer.start_time),
+            normalizeTime(peer.end_time),
+          ),
+      );
+
+      if (classConflict) {
+        conflicts.push({
+          sessionId: target.id,
+          sessionDate: target.session_date,
+          reason: 'class_conflict',
+          detail: '同班級於此時段已有課堂',
+          conflictingSessionId: classConflict.id,
+        });
+        continue;
+      }
+
+      if (target.teacher_id) {
+        const teacherConflict = teacherPeers.find(
+          (peer) =>
+            peer.teacher_id === target.teacher_id &&
+            peer.session_date === target.session_date &&
+            isTimeOverlap(
+              targetStart,
+              targetEnd,
+              normalizeTime(peer.start_time),
+              normalizeTime(peer.end_time),
+            ),
+        );
+
+        if (teacherConflict) {
+          conflicts.push({
+            sessionId: target.id,
+            sessionDate: target.session_date,
+            reason: 'teacher_conflict',
+            detail: '老師於此時段已有其他課堂',
+            conflictingSessionId: teacherConflict.id,
+          });
+          continue;
+        }
+      }
+
+      processableIds.push(target.id);
+    }
+
+    const missingCount = uniqueSessionIds.length - targetSessions.length;
+    const updated = processableIds.length;
+    const skipped = conflicts.length + missingCount;
+
+    if (!dryRun && updated > 0) {
+      const { error: reopenError } = await supabase
+        .from('sessions')
+        .update({ status: 'scheduled' })
+        .eq('org_id', orgId)
+        .eq('class_id', id)
+        .in('id', processableIds);
+
+      if (reopenError) {
+        return c.json({ error: reopenError.message, code: 'DB_ERROR' }, 400);
+      }
+
+      logAudit(
+        supabase,
+        {
+          orgId,
+          userId,
+          resourceType: 'class',
+          resourceId: id,
+          resourceName: (cls.name as string | null) ?? null,
+          action: 'batch_uncancel_session',
+          details: {
+            requested: uniqueSessionIds.length,
+            updated,
+            skipped,
+          },
+        },
+        c.executionCtx.waitUntil.bind(c.executionCtx),
+      );
+    }
+
+    return c.json(
+      {
+        updated,
+        skipped,
+        processableIds,
+        conflicts,
         dryRun,
       },
       200,
