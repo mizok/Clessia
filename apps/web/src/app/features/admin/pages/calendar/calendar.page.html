@@ -260,16 +260,96 @@
       </div>
 
       @if (selectedCount() > 0) {
+        @if (batchMode()) {
+          <div class="cal__batch-panel">
+            @switch (batchMode()) {
+              @case ('assign') {
+                <h4 class="cal__batch-panel-title">指派老師給 {{ selectedCount() }} 堂課</h4>
+                <p-select
+                  [options]="availableTeachers()"
+                  optionLabel="displayName"
+                  optionValue="id"
+                  placeholder="選擇老師"
+                  [filter]="true"
+                  filterBy="displayName"
+                  [ngModel]="batchTeacherId()"
+                  (ngModelChange)="batchTeacherId.set($event)"
+                  appendTo="body"
+                  class="cal__batch-panel-input"
+                />
+              }
+              @case ('time') {
+                <h4 class="cal__batch-panel-title">修改 {{ selectedCount() }} 堂課的上課時間</h4>
+                <div class="cal__batch-panel-row">
+                  <label class="cal__batch-panel-label">開始</label>
+                  <input pInputText type="time"
+                    [ngModel]="batchStartTime()"
+                    (ngModelChange)="batchStartTime.set($event)"
+                  />
+                  <label class="cal__batch-panel-label">結束</label>
+                  <input pInputText type="time"
+                    [ngModel]="batchEndTime()"
+                    (ngModelChange)="batchEndTime.set($event)"
+                  />
+                </div>
+              }
+              @case ('cancel') {
+                <h4 class="cal__batch-panel-title">停課 {{ selectedCount() }} 堂</h4>
+                <input pInputText
+                  placeholder="原因（選填）"
+                  [ngModel]="batchCancelReason()"
+                  (ngModelChange)="batchCancelReason.set($event)"
+                  class="cal__batch-panel-input"
+                />
+              }
+              @case ('uncancel') {
+                <h4 class="cal__batch-panel-title">取消停課 {{ selectedCount() }} 堂</h4>
+              }
+            }
+
+            @if (batchPreview()) {
+              <div class="cal__batch-preview">
+                <span class="cal__batch-preview-ok">{{ getProcessableCount() }} 堂可操作</span>
+                @if (getSkippedCount() > 0) {
+                  <span class="cal__batch-preview-skip">· {{ getSkippedCount() }} 堂略過</span>
+                }
+              </div>
+            }
+
+            <div class="cal__batch-panel-footer">
+              <p-button label="取消" [text]="true" size="small" (onClick)="closeBatchPanel()" />
+              @if (!batchPreview()) {
+                <p-button label="預覽" size="small"
+                  (onClick)="runBatchPreview()"
+                  [disabled]="batchMode() === 'assign' && !batchTeacherId()"
+                  [loading]="batchLoading()" />
+              } @else {
+                <p-button
+                  [label]="'確認 (' + getProcessableCount() + ' 堂)'"
+                  size="small"
+                  (onClick)="applyBatch()"
+                  [loading]="batchLoading()"
+                  [disabled]="getProcessableCount() === 0"
+                />
+              }
+            </div>
+          </div>
+        }
+
         <div class="cal__batch-bar">
           <span class="cal__batch-bar-count">已選 {{ selectedCount() }} 堂</span>
-          <p-button
-            label="取消選取"
-            severity="secondary"
-            [text]="true"
-            size="small"
-            icon="pi pi-times"
-            (onClick)="clearSelection()"
-          />
+          <div class="cal__batch-bar-actions">
+            <p-button label="指派老師" icon="pi pi-user-plus" size="small" severity="info"
+              (onClick)="openBatchPanel('assign')" />
+            <p-button label="改時間" icon="pi pi-clock" size="small" severity="secondary"
+              (onClick)="openBatchPanel('time')" />
+            <p-button label="停課" icon="pi pi-ban" size="small" severity="warn"
+              (onClick)="openBatchPanel('cancel')" />
+            <p-button label="取消停課" icon="pi pi-replay" size="small" severity="secondary"
+              (onClick)="openBatchPanel('uncancel')" />
+            <p-button label="取消選取" [text]="true" size="small" icon="pi pi-times"
+              (onClick)="clearSelection()" />
+          </div>
         </div>
       }
     } @else if (loading()) {

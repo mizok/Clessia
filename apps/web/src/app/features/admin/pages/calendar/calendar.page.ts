@@ -30,6 +30,7 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { DialogModule } from 'primeng/dialog';
 import { SelectModule } from 'primeng/select';
 import { SkeletonModule } from 'primeng/skeleton';
+import { InputTextModule } from 'primeng/inputtext';
 import { CheckboxModule } from 'primeng/checkbox';
 import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
@@ -50,7 +51,13 @@ import { Campus, CampusesService } from '@core/campuses.service';
 import { ClassesService } from '@core/classes.service';
 import { Course, CoursesService } from '@core/courses.service';
 import type { RouteObj } from '@core/smart-enums/routes-catalog';
-import { Session, SessionsService, ScheduleChange } from '@core/sessions.service';
+import {
+  Session,
+  SessionsService,
+  ScheduleChange,
+  type BatchAssignResult,
+  type BatchActionResult,
+} from '@core/sessions.service';
 import { Staff, StaffService } from '@core/staff.service';
 import { OverlayContainerService } from '@core/overlay-container.service';
 
@@ -79,6 +86,7 @@ const SLOT_HEIGHT_PX = 36;
     SkeletonModule,
     TooltipModule,
     MenuModule,
+    InputTextModule,
     CheckboxModule,
     ResponsiveTableComponent,
     RtColDefDirective,
@@ -292,6 +300,15 @@ export class CalendarPage implements OnInit, OnDestroy {
     return items;
   });
 
+  // ── Batch operations ─────────────────────────────────────────────────
+  protected readonly batchMode = signal<'assign' | 'time' | 'cancel' | 'uncancel' | null>(null);
+  protected readonly batchTeacherId = signal<string | null>(null);
+  protected readonly batchStartTime = signal('09:00');
+  protected readonly batchEndTime = signal('11:00');
+  protected readonly batchCancelReason = signal('');
+  protected readonly batchPreview = signal<BatchAssignResult | BatchActionResult | null>(null);
+  protected readonly batchLoading = signal(false);
+
   // ── Lifecycle ──────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.loadFilters();
@@ -377,6 +394,147 @@ export class CalendarPage implements OnInit, OnDestroy {
   protected getDayLabel(dateStr: string): string {
     const DAY_LABELS = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
     return DAY_LABELS[new Date(dateStr).getDay()];
+  }
+
+  // ── Batch panel actions ──────────────────────────────────────────────
+  protected openBatchPanel(mode: 'assign' | 'time' | 'cancel' | 'uncancel'): void {
+    this.batchMode.set(mode);
+    this.batchPreview.set(null);
+  }
+
+  protected closeBatchPanel(): void {
+    this.batchMode.set(null);
+    this.batchPreview.set(null);
+    this.batchTeacherId.set(null);
+    this.batchCancelReason.set('');
+  }
+
+  protected runBatchPreview(): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.batchLoading.set(true);
+
+    const mode = this.batchMode();
+    let obs: import('rxjs').Observable<BatchAssignResult | BatchActionResult>;
+
+    switch (mode) {
+      case 'assign':
+        obs = this.sessionsService.batchAssignTeacher({
+          sessionIds: ids,
+          teacherId: this.batchTeacherId()!,
+          dryRun: true,
+        });
+        break;
+      case 'time':
+        obs = this.sessionsService.batchUpdateTime({
+          sessionIds: ids,
+          startTime: this.batchStartTime(),
+          endTime: this.batchEndTime(),
+          dryRun: true,
+        });
+        break;
+      case 'cancel':
+        obs = this.sessionsService.batchCancel({
+          sessionIds: ids,
+          reason: this.batchCancelReason() || undefined,
+          dryRun: true,
+        });
+        break;
+      case 'uncancel':
+        obs = this.sessionsService.batchUncancel({ sessionIds: ids, dryRun: true });
+        break;
+      default:
+        return;
+    }
+
+    obs.subscribe({
+      next: (result) => {
+        this.batchPreview.set(result);
+        this.batchLoading.set(false);
+      },
+      error: () => {
+        this.batchLoading.set(false);
+        this.messageService.add({ severity: 'error', summary: '預覽失敗', detail: '無法執行預覽' });
+      },
+    });
+  }
+
+  protected applyBatch(): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.batchLoading.set(true);
+
+    const mode = this.batchMode();
+    let obs: import('rxjs').Observable<BatchAssignResult | BatchActionResult>;
+
+    switch (mode) {
+      case 'assign':
+        obs = this.sessionsService.batchAssignTeacher({
+          sessionIds: ids,
+          teacherId: this.batchTeacherId()!,
+          dryRun: false,
+        });
+        break;
+      case 'time':
+        obs = this.sessionsService.batchUpdateTime({
+          sessionIds: ids,
+          startTime: this.batchStartTime(),
+          endTime: this.batchEndTime(),
+          dryRun: false,
+        });
+        break;
+      case 'cancel':
+        obs = this.sessionsService.batchCancel({
+          sessionIds: ids,
+          reason: this.batchCancelReason() || undefined,
+          dryRun: false,
+        });
+        break;
+      case 'uncancel':
+        obs = this.sessionsService.batchUncancel({ sessionIds: ids, dryRun: false });
+        break;
+      default:
+        return;
+    }
+
+    obs.subscribe({
+      next: (result) => {
+        this.batchLoading.set(false);
+        const updated = 'updated' in result ? result.updated : 0;
+        this.closeBatchPanel();
+        this.clearSelection();
+        this.loadSessions();
+        this.messageService.add({
+          severity: 'success',
+          summary: '批次操作完成',
+          detail: `已更新 ${updated} 堂課`,
+        });
+      },
+      error: () => {
+        this.batchLoading.set(false);
+        this.messageService.add({ severity: 'error', summary: '操作失敗', detail: '批次操作失敗' });
+      },
+    });
+  }
+
+  protected getProcessableCount(): number {
+    const preview = this.batchPreview();
+    if (!preview) return 0;
+    if ('skippedConflicts' in preview) {
+      // BatchAssignResult
+      return preview.updated;
+    }
+    // BatchActionResult
+    return preview.processableIds.length;
+  }
+
+  protected getSkippedCount(): number {
+    const preview = this.batchPreview();
+    if (!preview) return 0;
+    if ('skippedConflicts' in preview) {
+      return preview.skippedConflicts + preview.skippedNotEligible;
+    }
+    return preview.skipped;
   }
 
   // ── Single-session actions ───────────────────────────────────────────

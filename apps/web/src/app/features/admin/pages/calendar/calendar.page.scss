@@ -142,16 +142,81 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-top: 1px solid var(--zinc-200);
-    background: var(--zinc-50);
+    padding: var(--space-2) var(--space-4);
+    background: var(--zinc-900);
+    color: #fff;
     flex-shrink: 0;
   }
 
   &__batch-bar-count {
     font-size: var(--text-sm);
     font-weight: var(--font-semibold);
+    white-space: nowrap;
+  }
+
+  &__batch-bar-actions {
+    display: flex;
+    gap: var(--space-1);
+    flex-wrap: wrap;
+  }
+
+  // ── Batch panel ─────────────────────────────────────────────────────
+  &__batch-panel {
+    background: var(--zinc-50);
+    border-top: 1px solid var(--zinc-200);
+    padding: var(--space-3) var(--space-4);
+    flex-shrink: 0;
+  }
+
+  &__batch-panel-title {
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
     color: var(--zinc-700);
+  }
+
+  &__batch-panel-input {
+    width: 100%;
+    max-width: 300px;
+  }
+
+  &__batch-panel-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  &__batch-panel-label {
+    font-size: var(--text-sm);
+    color: var(--zinc-500);
+  }
+
+  &__batch-panel-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  &__batch-preview {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--zinc-100);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+  }
+
+  &__batch-preview-ok {
+    color: var(--accent-600);
+    font-weight: var(--font-semibold);
+  }
+
+  &__batch-preview-skip {
+    color: var(--zinc-500);
   }
 
   // ── Skeleton ──────────────────────────────────────────────────────────
