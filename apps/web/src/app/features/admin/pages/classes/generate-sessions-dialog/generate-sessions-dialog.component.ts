@@ -3,38 +3,59 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { DatePickerModule } from 'primeng/datepicker';
+import { PaginatorModule, type PaginatorState } from 'primeng/paginator';
 import { MessageService } from 'primeng/api';
 import { DynamicDialogRef, DynamicDialogConfig } from 'primeng/dynamicdialog';
-import { ClassesService, Class, SessionPreview } from '@core/classes.service';
+import {
+  ClassesService,
+  Class,
+  SessionPreview,
+  type GenerateSessionsResult,
+} from '@core/classes.service';
+import { BrowserStateService } from '@core/browser-state.service';
 import { format } from 'date-fns';
 
 @Component({
   selector: 'app-generate-sessions-dialog',
   standalone: true,
-  imports: [CommonModule, FormsModule, ButtonModule, DatePickerModule],
+  imports: [CommonModule, FormsModule, ButtonModule, DatePickerModule, PaginatorModule],
   templateUrl: './generate-sessions-dialog.component.html',
   styleUrl: './generate-sessions-dialog.component.scss',
 })
 export class GenerateSessionsDialogComponent {
   private readonly classesService = inject(ClassesService);
+  private readonly browserStateService = inject(BrowserStateService);
   private readonly messageService = inject(MessageService);
   private readonly ref = inject(DynamicDialogRef);
   private readonly config = inject(DynamicDialogConfig);
 
   protected readonly loading = signal(false);
   protected readonly cls = signal<Class | null>(this.config.data?.cls ?? null);
-  protected readonly step = signal<'input' | 'preview'>('input');
+  protected readonly step = signal<'input' | 'preview' | 'result'>('input');
+  protected readonly generationResult = signal<GenerateSessionsResult | null>(null);
 
   protected readonly generateFrom = signal<Date | null>(null);
   protected readonly generateTo = signal<Date | null>(null);
   protected readonly excludeDates = signal<Date[]>([]);
   protected readonly previewSessions = signal<SessionPreview[]>([]);
+  protected readonly previewPaginationFirst = signal(0);
+  protected readonly previewPaginationRows = signal(10);
+  protected readonly previewPaginationRowsPerPageOptions = [10, 20, 50];
+  protected readonly isMobile = this.browserStateService.isMobile;
 
   protected readonly newCount = computed(
     () => this.previewSessions().filter((s) => !s.exists).length,
   );
   protected readonly skippedCount = computed(
     () => this.previewSessions().filter((s) => s.exists).length,
+  );
+  protected readonly paginatedPreviewSessions = computed(() => {
+    const first = this.previewPaginationFirst();
+    const rows = this.previewPaginationRows();
+    return this.previewSessions().slice(first, first + rows);
+  });
+  protected readonly showPreviewPagination = computed(
+    () => this.previewSessions().length > this.previewPaginationRows(),
   );
 
   protected readonly breadcrumb = computed(() => {
@@ -60,6 +81,7 @@ export class GenerateSessionsDialogComponent {
     this.classesService.previewSessions(c.id, fromStr, toStr, exclude).subscribe({
       next: (res) => {
         this.previewSessions.set(res.data);
+        this.previewPaginationFirst.set(0);
         this.loading.set(false);
         this.step.set('preview');
       },
@@ -88,14 +110,8 @@ export class GenerateSessionsDialogComponent {
     this.classesService.generateSessions(c.id, fromStr, toStr, exclude).subscribe({
       next: (res) => {
         this.loading.set(false);
-        const created = res.createdAssigned + res.createdUnassigned;
-        const skipped = res.skippedExisting + res.skippedNoTeacher;
-        this.messageService.add({
-          severity: 'success',
-          summary: '課堂產生完成',
-          detail: `已建立 ${created} 筆，略過 ${skipped} 筆`,
-        });
-        this.ref.close(true);
+        this.generationResult.set(res);
+        this.step.set('result');
       },
       error: (err) => {
         this.loading.set(false);
@@ -108,8 +124,29 @@ export class GenerateSessionsDialogComponent {
     });
   }
 
+  protected closeDone(): void {
+    this.ref.close('refresh');
+  }
+
+  protected goToCalendarList(): void {
+    const c = this.cls();
+    const from = this.generateFrom();
+    const to = this.generateTo();
+    this.ref.close({
+      action: 'navigate-calendar',
+      classId: c?.id,
+      from: from ? format(from, 'yyyy-MM-dd') : undefined,
+      to: to ? format(to, 'yyyy-MM-dd') : undefined,
+    });
+  }
+
   protected cancel(): void {
     this.ref.close();
+  }
+
+  protected onPreviewPaginationChange(event: PaginatorState): void {
+    this.previewPaginationFirst.set(event.first ?? 0);
+    this.previewPaginationRows.set(event.rows ?? 10);
   }
 
   protected getWeekdayLabel(weekday: number): string {

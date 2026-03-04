@@ -10,6 +10,7 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -110,7 +111,8 @@ export class CalendarPage implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
   private readonly overlayContainerService = inject(OverlayContainerService);
   private readonly dialogService = inject(DialogService);
-  private readonly authService = inject(AuthService); // Added authService injection
+  private readonly authService = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
 
   protected get overlayContainer(): HTMLElement | null {
     return this.overlayContainerService.getContainer();
@@ -311,6 +313,7 @@ export class CalendarPage implements OnInit, OnDestroy {
 
   // ── Lifecycle ──────────────────────────────────────────────────────────
   ngOnInit(): void {
+    this.applyQueryParams();
     this.loadFilters();
     this.loadSessions();
     this.listenToResize();
@@ -818,6 +821,19 @@ export class CalendarPage implements OnInit, OnDestroy {
   }
 
   // ── Private ────────────────────────────────────────────────────────────
+  private applyQueryParams(): void {
+    const params = this.route.snapshot.queryParams;
+    if (params['view'] === 'list') {
+      this.viewMode.set('list');
+    }
+    if (params['classId']) {
+      this.selectedClassId.set(params['classId']);
+    }
+    if (params['from']) {
+      this.currentDate.set(new Date(params['from']));
+    }
+  }
+
   private listenToResize(): void {
     fromEvent(window, 'resize')
       .pipe(debounceTime(150), takeUntilDestroyed(this.destroyRef))

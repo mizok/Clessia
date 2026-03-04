@@ -1,11 +1,20 @@
-import { Component, OnInit, inject, input, signal, computed } from '@angular/core';
-import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
+import {
+  Component,
+  OnInit,
+  inject,
+  input,
+  signal,
+  computed,
+  effect,
+  Injector,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 
 // PrimeNG
 import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
-import { DialogService, DynamicDialogRef } from 'primeng/dynamicdialog';
+import { DialogService } from 'primeng/dynamicdialog';
 import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ButtonModule } from 'primeng/button';
@@ -21,6 +30,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { DatePickerModule } from 'primeng/datepicker';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { InputNumberModule } from 'primeng/inputnumber';
+import { PaginatorModule, type PaginatorState } from 'primeng/paginator';
 
 import { CourseFormDialogComponent } from '../courses/course-form-dialog.component';
 import { ClassFormDialogComponent } from './class-form-dialog/class-form-dialog.component';
@@ -34,14 +44,14 @@ import { ClassesService, Class, Schedule } from '@core/classes.service';
 import { CoursesService, Course } from '@core/courses.service';
 import { CampusesService, Campus } from '@core/campuses.service';
 import { SubjectsService, Subject } from '@core/subjects.service';
-import { OverlayContainerDirective } from '@shared/directives/overlay-container.directive';
+import { OverlayContainerService } from '@core/overlay-container.service';
 import { StaffService, Staff } from '@core/staff.service';
 import { SessionsService } from '@core/sessions.service';
+import { BrowserStateService } from '@core/browser-state.service';
 
 // Shared
 import { EmptyStateComponent } from '@shared/components/empty-state/empty-state.component';
 import { AuditLogDialogComponent } from '@shared/components/audit-log-dialog/audit-log-dialog.component';
-import { BatchAssignWizardComponent } from './batch-assign-wizard/batch-assign-wizard.component';
 import type { RouteObj } from '@core/smart-enums/routes-catalog';
 
 interface CourseGroup {
@@ -65,6 +75,7 @@ interface CourseGroup {
     InputTextModule,
     SelectModule,
     MultiSelectModule,
+    PaginatorModule,
     TagModule,
     TooltipModule,
     EmptyStateComponent,
@@ -77,6 +88,7 @@ export class ClassesPage implements OnInit {
   readonly page = input.required<RouteObj>();
 
   private readonly dialogService = inject(DialogService);
+  private readonly router = inject(Router);
   private readonly coursesService = inject(CoursesService);
   private readonly classesService = inject(ClassesService);
   private readonly campusesService = inject(CampusesService);
@@ -84,15 +96,15 @@ export class ClassesPage implements OnInit {
   private readonly staffService = inject(StaffService);
   private readonly messageService = inject(MessageService);
   private readonly confirmationService = inject(ConfirmationService);
-  private readonly breakpointObserver = inject(BreakpointObserver);
-  private readonly overlayContainerDirective = inject(OverlayContainerDirective, {
-    optional: true,
-  });
+  private readonly overlayContainerService = inject(OverlayContainerService);
+  private readonly injector = inject(Injector);
+  private readonly browserStateService = inject(BrowserStateService);
+
   protected get overlayContainer(): HTMLElement | null {
-    return this.overlayContainerDirective?.nativeHTMLElement ?? null;
+    return this.overlayContainerService.getContainer();
   }
 
-  protected readonly isMobile = signal(false);
+  protected readonly isMobile = this.browserStateService.isMobile;
 
   // ---- Data ----
   protected readonly courses = signal<Course[]>([]);
@@ -108,6 +120,9 @@ export class ClassesPage implements OnInit {
 
   // ---- Selection ----
   protected readonly selectedClassIds = signal<Set<string>>(new Set());
+  protected readonly paginationFirst = signal(0);
+  protected readonly paginationRows = signal(10);
+  protected readonly paginationRowsPerPageOptions = [10, 20, 50];
 
   protected readonly selectedActiveCount = computed(
     () => this.classes().filter((cl) => this.selectedClassIds().has(cl.id) && cl.isActive).length,
@@ -118,7 +133,7 @@ export class ClassesPage implements OnInit {
   );
 
   protected readonly allVisibleSelected = computed(() => {
-    const visible = this.courseGroups().flatMap((g) => g.classes);
+    const visible = this.paginatedCourseGroups().flatMap((g) => g.classes);
     return visible.length > 0 && visible.every((cl) => this.selectedClassIds().has(cl.id));
   });
 
@@ -195,6 +210,12 @@ export class ClassesPage implements OnInit {
       this.showInactiveCourses(),
   );
 
+  protected readonly paginatedCourseGroups = computed(() => {
+    const first = this.paginationFirst();
+    const rows = this.paginationRows();
+    return this.courseGroups().slice(first, first + rows);
+  });
+
   // ---- Static options ----
   protected readonly gradeOptions = [
     { label: '小一', value: '小一' },
@@ -232,9 +253,36 @@ export class ClassesPage implements OnInit {
   // ================================================================
 
   ngOnInit(): void {
-    this.breakpointObserver.observe([Breakpoints.Handset]).subscribe((result) => {
-      this.isMobile.set(result.matches);
-    });
+    effect(
+      () => {
+        this.searchQuery();
+        this.selectedCampusId();
+        this.selectedSubjectId();
+        this.selectedTeacherIds();
+        this.statusFilter();
+        this.showInactiveCourses();
+        this.paginationFirst.set(0);
+      },
+      { injector: this.injector },
+    );
+
+    effect(
+      () => {
+        const total = this.courseGroups().length;
+        const rows = this.paginationRows();
+        const first = this.paginationFirst();
+        if (total === 0) {
+          if (first !== 0) this.paginationFirst.set(0);
+          return;
+        }
+        if (first >= total) {
+          const lastPageFirst = Math.floor((total - 1) / rows) * rows;
+          this.paginationFirst.set(lastPageFirst);
+        }
+      },
+      { injector: this.injector },
+    );
+
     this.loadAll();
   }
 
@@ -310,7 +358,7 @@ export class ClassesPage implements OnInit {
         command: () => this.openGenerateDialog(cls),
       },
       {
-        label: '查看課堂',
+        label: '管理課堂',
         icon: 'pi pi-list',
         command: () => this.openSessionListDialog(cls),
       },
@@ -382,12 +430,25 @@ export class ClassesPage implements OnInit {
   }
 
   protected toggleSelectAll(): void {
-    const visible = this.courseGroups().flatMap((g) => g.classes);
-    if (this.allVisibleSelected()) {
-      this.selectedClassIds.set(new Set());
-    } else {
-      this.selectedClassIds.set(new Set(visible.map((cl) => cl.id)));
-    }
+    const visibleIds = this.paginatedCourseGroups()
+      .flatMap((g) => g.classes)
+      .map((cl) => cl.id);
+    const shouldUnselectVisible = this.allVisibleSelected();
+
+    this.selectedClassIds.update((ids) => {
+      const next = new Set(ids);
+      if (shouldUnselectVisible) {
+        for (const id of visibleIds) next.delete(id);
+      } else {
+        for (const id of visibleIds) next.add(id);
+      }
+      return next;
+    });
+  }
+
+  protected onCoursePaginationChange(event: PaginatorState): void {
+    this.paginationFirst.set(event.first ?? 0);
+    this.paginationRows.set(event.rows ?? 10);
   }
 
   protected clearSelection(): void {
@@ -631,7 +692,18 @@ export class ClassesPage implements OnInit {
 
     if (ref)
       ref.onClose.subscribe((result) => {
-        if (result) this.loadAll();
+        if (result?.action === 'navigate-calendar') {
+          this.router.navigate(['/admin/calendar'], {
+            queryParams: {
+              view: 'list',
+              classId: result.classId,
+              from: result.from,
+              to: result.to,
+            },
+          });
+        } else if (result) {
+          this.loadAll();
+        }
       });
   }
 
@@ -730,32 +802,39 @@ export class ClassesPage implements OnInit {
     });
   }
 
-  protected openBatchAssignWizard(cls: Class): void {
-    const course = this.courses().find((c) => c.id === cls.courseId);
-    const ref = this.dialogService.open(BatchAssignWizardComponent, {
-      header: '批次指派老師',
-      width: '600px',
-      modal: true,
-      showHeader: false,
-      appendTo: this.overlayContainer || 'body',
-      data: {
-        classId: cls.id,
-        className: cls.name,
-        teachers: this.staff(),
-        campusId: cls.campusId,
-        subjectId: course?.subjectId,
-      },
-    });
-
-    if (ref)
-      ref.onClose.subscribe((result) => {
-        if (result) this.loadAll();
-      });
-  }
-
   // ================================================================
   // Helpers
   // ================================================================
+
+  protected hasCourseNeedsIntervention(group: CourseGroup): boolean {
+    const stats = this.getCourseInterventionStats(group);
+    return (
+      stats.noScheduleClassCount > 0 ||
+      stats.noUpcomingClassCount > 0 ||
+      stats.upcomingUnassignedCount > 0 ||
+      stats.upcomingConflictCount > 0
+    );
+  }
+
+  protected getCourseInterventionTooltip(group: CourseGroup): string {
+    const stats = this.getCourseInterventionStats(group);
+    const reasons: string[] = [];
+
+    if (stats.noScheduleClassCount > 0) {
+      reasons.push(`${stats.noScheduleClassCount} 個班級無時段`);
+    }
+    if (stats.noUpcomingClassCount > 0) {
+      reasons.push(`${stats.noUpcomingClassCount} 個班級無未來排程`);
+    }
+    if (stats.upcomingUnassignedCount > 0) {
+      reasons.push(`${stats.upcomingUnassignedCount} 堂課未指派老師`);
+    }
+    if (stats.upcomingConflictCount > 0) {
+      reasons.push(`${stats.upcomingConflictCount} 組時段衝突`);
+    }
+
+    return reasons.length > 0 ? `需介入：${reasons.join('、')}` : '目前無需介入';
+  }
 
   protected getWeekdayLabel(weekday: number): string {
     return ['', '週一', '週二', '週三', '週四', '週五', '週六', '週日'][weekday] ?? '';
@@ -778,5 +857,32 @@ export class ClassesPage implements OnInit {
 
   protected getCampusName(campusId: string): string {
     return this.campuses().find((c) => c.id === campusId)?.name ?? '未知分校';
+  }
+
+  private getCourseInterventionStats(group: CourseGroup): {
+    noScheduleClassCount: number;
+    noUpcomingClassCount: number;
+    upcomingUnassignedCount: number;
+    upcomingConflictCount: number;
+  } {
+    const activeClasses = group.classes.filter((cls) => cls.isActive);
+    return {
+      noScheduleClassCount: activeClasses.filter((cls) => (cls.scheduleCount ?? 0) === 0).length,
+      noUpcomingClassCount: activeClasses.filter(
+        (cls) =>
+          (cls.scheduleCount ?? 0) > 0 &&
+          !cls.hasUpcomingSessions &&
+          (cls.upcomingCancelledCount ?? 0) === 0,
+      ).length,
+      upcomingUnassignedCount: activeClasses.reduce(
+        (sum, cls) => sum + (cls.upcomingUnassignedCount ?? 0),
+        0,
+      ),
+      upcomingConflictCount: activeClasses.reduce(
+        (sum, cls) =>
+          sum + (cls.upcomingClassConflictCount ?? 0) + (cls.upcomingTeacherConflictCount ?? 0),
+        0,
+      ),
+    };
   }
 }

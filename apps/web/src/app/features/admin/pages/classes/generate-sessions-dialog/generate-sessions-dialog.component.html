@@ -12,7 +12,29 @@
   </div>
 
   <div class="form-dialog__content">
-    @if (step() === 'input') {
+    @if (step() === 'result') {
+      <div class="gen-result">
+        <div class="gen-result__icon">
+          <i class="pi pi-check-circle"></i>
+        </div>
+        <div class="gen-result__body">
+          @let result = generationResult()!;
+          <p class="gen-result__title">
+            已建立 {{ result.createdAssigned + result.createdUnassigned }} 堂課
+          </p>
+          @if (result.createdUnassigned > 0) {
+            <p class="gen-result__detail">
+              其中 {{ result.createdUnassigned }} 堂待指派老師
+            </p>
+          }
+          @if (result.skippedExisting > 0) {
+            <p class="gen-result__detail">
+              {{ result.skippedExisting }} 堂已存在，已略過
+            </p>
+          }
+        </div>
+      </div>
+    } @else if (step() === 'input') {
       <p class="generate-hint">選擇日期範圍，系統將依照上課時間表批次產生課堂記錄。</p>
 
       <div class="form-dialog__row">
@@ -89,7 +111,7 @@
                 </tr>
               </thead>
               <tbody>
-                @for (s of previewSessions(); track $index) {
+                @for (s of paginatedPreviewSessions(); track $index) {
                   <tr [class.generate-preview__row--exists]="s.exists">
                     <td>{{ s.sessionDate }}</td>
                     <td>{{ getWeekdayLabel(s.weekday) }}</td>
@@ -111,13 +133,45 @@
               </tbody>
             </table>
           </div>
+
+          @if (showPreviewPagination()) {
+            <div class="generate-preview__pagination">
+              <p-paginator
+                [first]="previewPaginationFirst()"
+                [rows]="previewPaginationRows()"
+                [totalRecords]="previewSessions().length"
+                [rowsPerPageOptions]="isMobile() ? undefined : previewPaginationRowsPerPageOptions"
+                [showCurrentPageReport]="true"
+                [currentPageReportTemplate]="
+                  isMobile()
+                    ? '第 {currentPage} / {totalPages} 頁'
+                    : '顯示 {first} - {last}，共 {totalRecords} 筆'
+                "
+                [showPageLinks]="!isMobile()"
+                [showFirstLastIcon]="!isMobile()"
+                (onPageChange)="onPreviewPaginationChange($event)"
+              />
+            </div>
+          }
         }
       </div>
     }
   </div>
 
   <div class="form-dialog__footer">
-    @if (step() === 'input') {
+    @if (step() === 'result') {
+      <p-button label="稍後指派" [text]="true" severity="secondary" (onClick)="closeDone()" />
+      @if (generationResult()!.createdUnassigned > 0) {
+        <p-button
+          label="前往指派老師"
+          icon="pi pi-arrow-right"
+          iconPos="right"
+          (onClick)="goToCalendarList()"
+        />
+      } @else {
+        <p-button label="完成" (onClick)="closeDone()" />
+      }
+    } @else if (step() === 'input') {
       <p-button label="取消" [text]="true" severity="secondary" (onClick)="cancel()" />
       <p-button
         label="預覽課堂"
