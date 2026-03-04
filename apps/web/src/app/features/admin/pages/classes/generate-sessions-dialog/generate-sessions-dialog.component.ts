@@ -84,6 +84,13 @@ export class GenerateSessionsDialogComponent {
         this.previewPaginationFirst.set(0);
         this.loading.set(false);
         this.step.set('preview');
+        if (res.data.length > 200) {
+          this.messageService.add({
+            severity: 'warn',
+            summary: '數量較多',
+            detail: `即將建立 ${res.data.filter((s) => !s.exists).length} 堂課，請確認日期範圍是否正確`,
+          });
+        }
       },
       error: (err) => {
         this.loading.set(false);

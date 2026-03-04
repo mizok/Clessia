@@ -1,6 +1,8 @@
 import {
   Component,
   DestroyRef,
+  ElementRef,
+  HostListener,
   OnInit,
   OnDestroy,
   computed,
@@ -113,6 +115,7 @@ export class CalendarPage implements OnInit, OnDestroy {
   private readonly dialogService = inject(DialogService);
   private readonly authService = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
+  private readonly elementRef = inject(ElementRef);
 
   protected get overlayContainer(): HTMLElement | null {
     return this.overlayContainerService.getContainer();
@@ -320,7 +323,19 @@ export class CalendarPage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // No explicit cleanup needed for takeUntilDestroyed, but good to have the method if needed later.
+    // No explicit cleanup needed for takeUntilDestroyed
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (this.showDatePicker()) {
+      const target = event.target as HTMLElement;
+      const dpPopup = this.elementRef.nativeElement.querySelector('.cal__datepicker-popup');
+      const dpButton = this.elementRef.nativeElement.querySelector('.cal__subtitle');
+      if (dpPopup && !dpPopup.contains(target) && dpButton && !dpButton.contains(target)) {
+        this.showDatePicker.set(false);
+      }
+    }
   }
 
   // ── Navigation ─────────────────────────────────────────────────────────
