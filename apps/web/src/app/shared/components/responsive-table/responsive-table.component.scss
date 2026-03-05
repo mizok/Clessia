@@ -209,6 +209,12 @@
   }
 
   @media (max-width: 768px) {
+    // 移除外框裝飾，讓表格融入背景
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--color-white);
+
     &__head &__header-cell,
     &__cell {
       padding: var(--space-2) var(--space-3);

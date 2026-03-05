@@ -513,8 +513,21 @@
 
 @include bp.respond-to('mobile') {
   .cal {
-    padding: var(--space-3);
-    gap: var(--space-3);
+    padding: var(--space-2);
+    gap: var(--space-2);
+
+    // 移除手機版 card 裝飾
+    &__card {
+      border-radius: 0;
+      box-shadow: none;
+      border-left: 0;
+      border-right: 0;
+    }
+
+    // 清單區域去掉 padding，撐滿空間
+    &__list {
+      padding: 0;
+    }
 
     &__filters {
       flex-wrap: nowrap;
