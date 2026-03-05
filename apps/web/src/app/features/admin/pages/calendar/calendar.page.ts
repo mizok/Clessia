@@ -41,6 +41,7 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { TooltipModule } from 'primeng/tooltip';
+import { DrawerModule } from 'primeng/drawer';
 import { DialogService } from 'primeng/dynamicdialog';
 import { ResponsiveTableComponent } from '@shared/components/responsive-table/responsive-table.component';
 import { RtColDefDirective } from '@shared/components/responsive-table/rt-col-def.directive';
@@ -53,6 +54,7 @@ import type {
 import { OverlayContainerDirective } from '@shared/directives/overlay-container.directive';
 
 import { AuthService } from '@core/auth.service';
+import { BrowserStateService } from '@core/browser-state.service';
 import { Campus, CampusesService } from '@core/campuses.service';
 import { ClassesService } from '@core/classes.service';
 import { Course, CoursesService } from '@core/courses.service';
@@ -95,6 +97,7 @@ const SLOT_HEIGHT_PX = 36;
     MenuModule,
     InputTextModule,
     CheckboxModule,
+    DrawerModule,
     ResponsiveTableComponent,
     RtColDefDirective,
     RtColCellDirective,
@@ -118,8 +121,12 @@ export class CalendarPage implements OnInit, OnDestroy {
   private readonly overlayContainerService = inject(OverlayContainerService);
   private readonly dialogService = inject(DialogService);
   private readonly authService = inject(AuthService);
+  private readonly browserStateService = inject(BrowserStateService);
   private readonly route = inject(ActivatedRoute);
   private readonly elementRef = inject(ElementRef);
+
+  protected readonly isMobile = this.browserStateService.isMobile;
+  protected readonly showBatchSheet = signal(false);
 
   protected get overlayContainer(): HTMLElement | null {
     return this.overlayContainerService.getContainer();
@@ -442,6 +449,19 @@ export class CalendarPage implements OnInit, OnDestroy {
     this.batchCancelReason.set('');
   }
 
+  protected openBatchSheet(): void {
+    this.showBatchSheet.set(true);
+  }
+
+  protected closeBatchSheet(): void {
+    this.showBatchSheet.set(false);
+    this.closeBatchPanel();
+  }
+
+  protected selectBatchAction(mode: 'assign' | 'time' | 'cancel' | 'uncancel'): void {
+    this.openBatchPanel(mode);
+  }
+
   protected runBatchPreview(): void {
     const ids = [...this.selectedIds()];
     if (ids.length === 0) return;
@@ -534,6 +554,7 @@ export class CalendarPage implements OnInit, OnDestroy {
       next: (result) => {
         this.batchLoading.set(false);
         const updated = 'updated' in result ? result.updated : 0;
+        this.showBatchSheet.set(false);
         this.closeBatchPanel();
         this.clearSelection();
         this.loadSessions();

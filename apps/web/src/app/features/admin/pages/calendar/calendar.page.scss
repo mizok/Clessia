@@ -550,27 +550,116 @@
       font-size: var(--text-lg);
     }
 
-    &__batch-bar {
-      flex-direction: column;
-      align-items: stretch;
-      gap: var(--space-2);
-      padding: var(--space-2) var(--space-3);
+    // 手機版 floating batch bar
+    &__mobile-batch-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+      height: 48px;
+      padding: 0 var(--space-3);
+      background: var(--accent-600);
+      color: #fff;
+      z-index: 100;
+      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.12);
     }
 
-    &__batch-bar-count {
-      text-align: center;
+    &__mobile-batch-bar-count {
+      font-size: var(--text-sm);
+      font-weight: var(--font-semibold);
     }
 
-    &__batch-bar-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+    &__mobile-batch-bar-actions {
+      display: flex;
+      align-items: center;
       gap: var(--space-2);
-      margin-left: 0;
+    }
 
-      // 取消選取按鈕佔滿整行
-      > :last-child {
-        grid-column: 1 / -1;
-      }
+    // 隱藏桌面版 batch bar / panel
+    &__batch-bar,
+    &__batch-panel {
+      display: none;
     }
   }
+}
+
+// ── Batch drawer (bottom sheet) ────────────────────────────────────
+.cal__batch-drawer {
+  .p-drawer-content {
+    padding: var(--space-3) var(--space-4) var(--space-6);
+  }
+}
+
+.cal__batch-drawer-header {
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  color: var(--zinc-800);
+}
+
+.cal__batch-drawer-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cal__batch-drawer-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2);
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  font-size: var(--text-md);
+  color: var(--zinc-700);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+  width: 100%;
+  text-align: left;
+
+  i {
+    font-size: 1.1rem;
+    width: 24px;
+    text-align: center;
+    color: var(--zinc-500);
+  }
+
+  &:hover {
+    background: var(--zinc-100);
+  }
+
+  &:active {
+    background: var(--zinc-200);
+  }
+}
+
+.cal__batch-drawer-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--zinc-700);
+}
+
+.cal__batch-drawer-time-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.cal__batch-drawer-label {
+  font-size: var(--text-sm);
+  color: var(--zinc-500);
+  min-width: 40px;
+}
+
+.cal__batch-drawer-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--zinc-200);
 }
