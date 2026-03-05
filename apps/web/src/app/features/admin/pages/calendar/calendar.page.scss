@@ -536,5 +536,28 @@
     &__title {
       font-size: var(--text-lg);
     }
+
+    &__batch-bar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+    }
+
+    &__batch-bar-count {
+      text-align: center;
+    }
+
+    &__batch-bar-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-2);
+      margin-left: 0;
+
+      // 取消選取按鈕佔滿整行
+      > :last-child {
+        grid-column: 1 / -1;
+      }
+    }
   }
 }

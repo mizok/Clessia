@@ -217,7 +217,7 @@ export class CalendarPage implements OnInit, OnDestroy {
 
   protected readonly dayLabel = computed(() => {
     const date = this.currentDate();
-    const dateStr = format(date, 'M/d (EEE)', { locale: zhTW });
+    const dateStr = format(date, 'yyyy/M/d (EEE)', { locale: zhTW });
     return isToday(date) ? `今天 · ${dateStr}` : dateStr;
   });
 

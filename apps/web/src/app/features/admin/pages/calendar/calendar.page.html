@@ -374,16 +374,16 @@
         <div class="cal__batch-bar">
           <span class="cal__batch-bar-count">已選 {{ selectedCount() }} 堂</span>
           <div class="cal__batch-bar-actions">
-            <p-button label="指派老師" icon="pi pi-user-plus" size="small" severity="info"
-              (onClick)="openBatchPanel('assign')" />
+            <p-button label="指派老師" icon="pi pi-user-plus" size="small"
+              [outlined]="true" (onClick)="openBatchPanel('assign')" />
             <p-button label="改時間" icon="pi pi-clock" size="small" severity="secondary"
-              (onClick)="openBatchPanel('time')" />
+              [outlined]="true" (onClick)="openBatchPanel('time')" />
             <p-button label="停課" icon="pi pi-ban" size="small" severity="warn"
-              (onClick)="openBatchPanel('cancel')" />
+              [outlined]="true" (onClick)="openBatchPanel('cancel')" />
             <p-button label="取消停課" icon="pi pi-replay" size="small" severity="secondary"
-              (onClick)="openBatchPanel('uncancel')" />
+              [outlined]="true" (onClick)="openBatchPanel('uncancel')" />
             <p-button label="取消選取" [text]="true" size="small" icon="pi pi-times"
-              (onClick)="clearSelection()" />
+              severity="secondary" (onClick)="clearSelection()" />
           </div>
         </div>
       }
