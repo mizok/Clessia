@@ -13,7 +13,7 @@
   overflow: hidden;
 }
 
-@include bp.respond-to('mobile') {
+@container shell-content (max-width: 640px) {
   :host {
     min-height: 100%;
   }
@@ -650,7 +650,7 @@
   }
 }
 
-@include bp.respond-to('mobile') {
+@container shell-content (max-width: 640px) {
   .cal {
     padding: 0;
     gap: 0;
