@@ -13,6 +13,12 @@
   overflow: hidden;
 }
 
+@include bp.respond-to('mobile') {
+  :host {
+    min-height: 100%;
+  }
+}
+
 .cal {
   padding: var(--space-6);
   display: flex;
@@ -138,6 +144,48 @@
     min-height: 0;
     overflow: auto;
     padding: var(--space-4);
+  }
+
+  // ── Mobile floating batch bar ────────────────────────────────────────
+  &__mobile-batch-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    left: var(--space-3);
+    right: var(--space-3);
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px) + var(--space-3));
+    height: 48px;
+    padding: 0 var(--space-4);
+    background: color-mix(in srgb, var(--zinc-900) 78%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--color-white);
+    border-radius: var(--radius-xl);
+    z-index: 100;
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.18),
+      inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  &__mobile-batch-bar-count {
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
+  &__mobile-batch-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  &__mobile-batch-bar-close {
+    color: var(--color-white) !important;
+    opacity: 0.8;
+
+    &:hover {
+      opacity: 1;
+    }
   }
 
   // ── Batch bar ───────────────────────────────────────────────────────
@@ -645,21 +693,30 @@
 
 @include bp.respond-to('mobile') {
   .cal {
-    padding: var(--space-2);
-    gap: var(--space-2);
+    padding: 0;
+    gap: 0;
+
+    // 手機版標題與篩選區保留水平 padding
+    &__header,
+    &__mobile-filters {
+      padding-left: var(--space-3);
+      padding-right: var(--space-3);
+    }
+
+    &__header {
+      padding-top: var(--space-2);
+    }
 
     // 移除手機版 card 裝飾
     &__card {
       border-radius: 0;
       box-shadow: none;
-      border-left: 0;
-      border-right: 0;
+      border: 0;
     }
 
-    // 清單區域去掉 padding，撐滿空間；底部留空給 floating bar
+    // 清單區域去掉 padding，撐滿空間
     &__list {
       padding: 0;
-      padding-bottom: 56px;
     }
 
     &__filters {
@@ -683,64 +740,10 @@
       font-size: var(--text-lg);
     }
 
-    // 手機版 floating batch bar
-    &__mobile-batch-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-      height: 48px;
-      padding: 0 var(--space-3);
-      background: var(--accent-600);
-      color: #fff;
-      z-index: 100;
-      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.12);
-    }
-
-    &__mobile-batch-bar-count {
-      font-size: var(--text-sm);
-      font-weight: var(--font-semibold);
-    }
-
-    &__mobile-batch-bar-actions {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-    }
-
-    &__mobile-batch-bar-close {
-      color: var(--color-white) !important;
-      opacity: 0.8;
-
-      &:hover {
-        opacity: 1;
-      }
-    }
-
     // 隱藏桌面版 batch bar / panel
     &__batch-bar,
     &__batch-panel {
       display: none;
     }
-  }
-}
-
-// ── PrimeNG overlays (rendered outside component scope) ──────────────
-// Uses ::ng-deep because PrimeNG renders these at document body level.
-:host ::ng-deep .cal__batch-drawer {
-  .p-drawer-content {
-    padding: var(--space-3) var(--space-4) var(--space-6);
-  }
-}
-
-:host ::ng-deep .cal__filter-dialog {
-  .p-dialog-content {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4) var(--space-4);
   }
 }

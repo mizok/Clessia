@@ -32,7 +32,6 @@ import { MessageService, type MenuItem } from 'primeng/api';
 import { MenuModule } from 'primeng/menu';
 import { ButtonModule } from 'primeng/button';
 import { DatePickerModule } from 'primeng/datepicker';
-import { DialogModule } from 'primeng/dialog';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { SelectModule } from 'primeng/select';
 import { SkeletonModule } from 'primeng/skeleton';
@@ -41,7 +40,6 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { TooltipModule } from 'primeng/tooltip';
-import { Drawer } from 'primeng/drawer';
 import { DialogService } from 'primeng/dynamicdialog';
 import { ResponsiveTableComponent } from '@shared/components/responsive-table/responsive-table.component';
 import { RtColDefDirective } from '@shared/components/responsive-table/rt-col-def.directive';
@@ -74,6 +72,16 @@ import { SessionDetailDialogComponent } from './dialogs/session-detail-dialog/se
 import { SessionOverflowDialogComponent } from './dialogs/session-overflow-dialog/session-overflow-dialog.component';
 import { SessionRescheduleDialogComponent } from './dialogs/session-reschedule-dialog/session-reschedule-dialog.component';
 import { SessionSubstituteDialogComponent } from './dialogs/session-substitute-dialog/session-substitute-dialog.component';
+import {
+  MobileFilterDialogComponent,
+  type MobileFilterDialogData,
+  type MobileFilterDialogResult,
+} from './dialogs/mobile-filter-dialog/mobile-filter-dialog.component';
+import {
+  MobileBatchDialogComponent,
+  type MobileBatchDialogData,
+  type MobileBatchDialogResult,
+} from './dialogs/mobile-batch-dialog/mobile-batch-dialog.component';
 
 const CALENDAR_START_HOUR = 8;
 const CALENDAR_END_HOUR = 22;
@@ -89,7 +97,6 @@ const SLOT_HEIGHT_PX = 36;
     SelectModule,
     MultiSelectModule,
     DatePickerModule,
-    DialogModule,
     ToastModule,
     TagModule,
     SkeletonModule,
@@ -97,7 +104,6 @@ const SLOT_HEIGHT_PX = 36;
     MenuModule,
     InputTextModule,
     CheckboxModule,
-    Drawer,
     ResponsiveTableComponent,
     RtColDefDirective,
     RtColCellDirective,
@@ -126,8 +132,6 @@ export class CalendarPage implements OnInit, OnDestroy {
   private readonly elementRef = inject(ElementRef);
 
   protected readonly isMobile = this.browserStateService.isMobile;
-  protected readonly showBatchSheet = signal(false);
-  protected readonly showMobileFilters = signal(false);
 
   protected readonly activeFilterCount = computed(() => {
     let count = 0;
@@ -462,24 +466,57 @@ export class CalendarPage implements OnInit, OnDestroy {
   }
 
   protected openBatchSheet(): void {
-    this.showBatchSheet.set(true);
-  }
-
-  protected closeBatchSheet(): void {
-    this.showBatchSheet.set(false);
-    this.closeBatchPanel();
-  }
-
-  protected selectBatchAction(mode: 'assign' | 'time' | 'cancel' | 'uncancel'): void {
-    this.openBatchPanel(mode);
+    const data: MobileBatchDialogData = {
+      sessionIds: [...this.selectedIds()],
+      selectedCount: this.selectedCount(),
+      teachers: this.availableTeachers(),
+    };
+    const ref = this.dialogService.open(MobileBatchDialogComponent, {
+      header: `已選 ${this.selectedCount()} 堂`,
+      width: 'calc(var(--window-width, 360px) * 0.9)',
+      style: { 'max-width': '400px' },
+      closable: true,
+      closeOnEscape: true,
+      dismissableMask: true,
+      data,
+    });
+    ref?.onClose.subscribe((result?: MobileBatchDialogResult) => {
+      if (result?.action === 'applied') {
+        this.clearSelection();
+        this.loadSessions();
+      }
+    });
   }
 
   protected toggleMobileFilters(): void {
-    this.showMobileFilters.update((v) => !v);
-  }
-
-  protected closeMobileFilters(): void {
-    this.showMobileFilters.set(false);
+    const data: MobileFilterDialogData = {
+      campuses: this.campuses(),
+      courses: this.courses(),
+      teachers: this.activeTeachers(),
+      classes: this.classes(),
+      selectedCampusId: this.selectedCampusId(),
+      selectedCourseId: this.selectedCourseId(),
+      selectedTeacherIds: this.selectedTeacherIds(),
+      selectedClassId: this.selectedClassId(),
+    };
+    const ref = this.dialogService.open(MobileFilterDialogComponent, {
+      header: '篩選條件',
+      width: 'calc(var(--window-width, 360px) * 0.9)',
+      style: { 'max-width': '400px' },
+      closable: true,
+      closeOnEscape: true,
+      dismissableMask: true,
+      data,
+    });
+    ref?.onClose.subscribe((result?: MobileFilterDialogResult) => {
+      if (result) {
+        this.selectedCampusId.set(result.campusId);
+        this.selectedCourseId.set(result.courseId);
+        this.selectedTeacherIds.set(result.teacherIds);
+        this.selectedClassId.set(result.classId);
+        this.loadSessions();
+      }
+    });
   }
 
   protected runBatchPreview(): void {
@@ -574,7 +611,6 @@ export class CalendarPage implements OnInit, OnDestroy {
       next: (result) => {
         this.batchLoading.set(false);
         const updated = 'updated' in result ? result.updated : 0;
-        this.showBatchSheet.set(false);
         this.closeBatchPanel();
         this.clearSelection();
         this.loadSessions();
@@ -928,9 +964,6 @@ export class CalendarPage implements OnInit, OnDestroy {
       .pipe(debounceTime(150), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
         const isWide = window.innerWidth >= 768;
-        // Close mobile-only dialogs on resize
-        this.showMobileFilters.set(false);
-        this.showBatchSheet.set(false);
         if (this.isWeekView() !== isWide) {
           this.isWeekView.set(isWide);
           // Only reload for calendar view; list view has its own date range

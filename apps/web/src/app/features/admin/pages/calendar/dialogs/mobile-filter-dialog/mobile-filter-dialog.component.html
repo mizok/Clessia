@@ -1,0 +1,85 @@
+<div class="mobile-filter-dialog">
+  @if (campuses().length > 1) {
+    <div class="mobile-filter-dialog__row">
+      <label class="mobile-filter-dialog__label">分校</label>
+      <p-select
+        [options]="campuses()"
+        optionLabel="name"
+        optionValue="id"
+        placeholder="選擇分校"
+        [appendTo]="'body'"
+        [filter]="true"
+        filterBy="name"
+        [ngModel]="selectedCampusId()"
+        (ngModelChange)="onCampusChange($event)"
+        styleClass="w-full"
+      />
+    </div>
+  }
+  @if (selectedCampusId() && availableCourses().length > 0) {
+    <div class="mobile-filter-dialog__row">
+      <label class="mobile-filter-dialog__label">課程</label>
+      <p-select
+        [options]="availableCourses()"
+        optionLabel="name"
+        optionValue="id"
+        placeholder="所有課程"
+        [appendTo]="'body'"
+        [filter]="true"
+        filterBy="name"
+        [showClear]="true"
+        [ngModel]="selectedCourseId()"
+        (ngModelChange)="onCourseChange($event)"
+        styleClass="w-full"
+      />
+    </div>
+  }
+  @if (selectedCampusId() && availableTeachers().length > 0) {
+    <div class="mobile-filter-dialog__row">
+      <label class="mobile-filter-dialog__label">老師</label>
+      <p-multiselect
+        [options]="availableTeachers()"
+        optionLabel="displayName"
+        optionValue="id"
+        placeholder="所有老師"
+        selectedItemsLabel="{0} 位老師"
+        [appendTo]="'body'"
+        [filter]="true"
+        filterPlaceholder="搜尋老師..."
+        [ngModel]="selectedTeacherIds()"
+        (ngModelChange)="onTeacherIdsChange($event)"
+        styleClass="w-full"
+      />
+    </div>
+  }
+  @if (selectedCampusId() && availableClasses().length > 0) {
+    <div class="mobile-filter-dialog__row">
+      <label class="mobile-filter-dialog__label">班級</label>
+      <p-select
+        [options]="availableClasses()"
+        optionLabel="name"
+        optionValue="id"
+        placeholder="所有班級"
+        [appendTo]="'body'"
+        [filter]="true"
+        [showClear]="true"
+        [ngModel]="selectedClassId()"
+        (ngModelChange)="onClassChange($event)"
+        styleClass="w-full"
+      />
+    </div>
+  }
+  <div class="mobile-filter-dialog__actions">
+    @if (hasActiveFilters()) {
+      <p-button
+        label="清除全部"
+        severity="secondary"
+        [text]="true"
+        size="small"
+        icon="pi pi-times"
+        (onClick)="clearFilters()"
+      />
+    }
+    <p-button label="套用" size="small" (onClick)="apply()" />
+  </div>
+</div>
