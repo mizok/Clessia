@@ -11,6 +11,7 @@
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
 @container shell-content (max-width: 640px) {
@@ -146,6 +147,11 @@
     padding: var(--space-4);
   }
 
+
+  // ── Mobile floating batch bar (hidden by default, shown via container query) ──
+  &__mobile-batch-bar {
+    display: none;
+  }
 
   // ── Batch bar ───────────────────────────────────────────────────────
   &__batch-bar {
@@ -699,15 +705,21 @@
       font-size: var(--text-lg);
     }
 
+    // 隱藏桌面版 batch bar / panel
+    &__batch-bar,
+    &__batch-panel {
+      display: none;
+    }
+
     // ── Mobile floating batch bar ──────────────────────────────────────
     &__mobile-batch-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      position: fixed;
+      position: absolute;
       left: var(--space-3);
       right: var(--space-3);
-      bottom: calc(64px + env(safe-area-inset-bottom, 0px) + var(--space-3));
+      bottom: var(--space-3);
       height: 48px;
       padding: 0 var(--space-4);
       background: color-mix(in srgb, var(--zinc-900) 78%, transparent);

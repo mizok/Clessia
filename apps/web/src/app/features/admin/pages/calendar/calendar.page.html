@@ -332,8 +332,8 @@
         }
       </div>
 
-      <!-- Mobile: Floating batch bar -->
-      @if (selectedCount() > 0 && isMobile()) {
+      <!-- Mobile: Floating batch bar (visibility controlled by CSS container query) -->
+      @if (selectedCount() > 0) {
         <div class="cal__mobile-batch-bar">
           <span class="cal__mobile-batch-bar-count">已選 {{ selectedCount() }} 堂</span>
           <div class="cal__mobile-batch-bar-actions">
@@ -351,8 +351,8 @@
         </div>
       }
 
-      <!-- Desktop: Batch panel + bar -->
-      @if (selectedCount() > 0 && !isMobile()) {
+      <!-- Desktop: Batch panel + bar (visibility controlled by CSS container query) -->
+      @if (selectedCount() > 0) {
         @if (batchMode()) {
           <div class="cal__batch-panel">
             @switch (batchMode()) {
