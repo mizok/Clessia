@@ -117,93 +117,99 @@
       </button>
     </div>
 
-    @if (showMobileFilters()) {
-      <div class="cal__mobile-filter-backdrop" (click)="closeMobileFilters()"></div>
-      <div class="cal__mobile-filter-panel">
-        @if (campuses().length > 1) {
-          <div class="cal__mobile-filter-row">
-            <label class="cal__mobile-filter-label">分校</label>
-            <p-select
-              [options]="campuses()"
-              optionLabel="name"
-              optionValue="id"
-              placeholder="選擇分校"
-              [appendTo]="'body'"
-              [filter]="true"
-              filterBy="name"
-              [ngModel]="selectedCampusId()"
-              (ngModelChange)="onCampusChange($event)"
-              styleClass="w-full"
-            />
-          </div>
-        }
-        @if (selectedCampusId() && availableCourses().length > 0) {
-          <div class="cal__mobile-filter-row">
-            <label class="cal__mobile-filter-label">課程</label>
-            <p-select
-              [options]="availableCourses()"
-              optionLabel="name"
-              optionValue="id"
-              placeholder="所有課程"
-              [appendTo]="'body'"
-              [filter]="true"
-              filterBy="name"
-              [showClear]="true"
-              [ngModel]="selectedCourseId()"
-              (ngModelChange)="onCourseChange($event)"
-              styleClass="w-full"
-            />
-          </div>
-        }
-        @if (selectedCampusId() && availableTeachers().length > 0) {
-          <div class="cal__mobile-filter-row">
-            <label class="cal__mobile-filter-label">老師</label>
-            <p-multiselect
-              [options]="availableTeachers()"
-              optionLabel="displayName"
-              optionValue="id"
-              placeholder="所有老師"
-              selectedItemsLabel="{0} 位老師"
-              [appendTo]="'body'"
-              [filter]="true"
-              filterPlaceholder="搜尋老師..."
-              [ngModel]="selectedTeacherIds()"
-              (ngModelChange)="onTeacherIdsChange($event)"
-              styleClass="w-full"
-            />
-          </div>
-        }
-        @if (selectedCampusId() && availableClasses().length > 0) {
-          <div class="cal__mobile-filter-row">
-            <label class="cal__mobile-filter-label">班級</label>
-            <p-select
-              [options]="availableClasses()"
-              optionLabel="name"
-              optionValue="id"
-              placeholder="所有班級"
-              [appendTo]="'body'"
-              [filter]="true"
-              [showClear]="true"
-              [ngModel]="selectedClassId()"
-              (ngModelChange)="onClassChange($event)"
-              styleClass="w-full"
-            />
-          </div>
-        }
-        @if (hasActiveFilters()) {
-          <div class="cal__mobile-filter-row" style="justify-content: flex-end">
-            <p-button
-              label="清除全部"
-              severity="secondary"
-              [text]="true"
-              size="small"
-              icon="pi pi-times"
-              (onClick)="clearFilters()"
-            />
-          </div>
-        }
-      </div>
-    }
+    <p-dialog
+      header="篩選條件"
+      [(visible)]="showMobileFilters"
+      [modal]="true"
+      [draggable]="false"
+      [resizable]="false"
+      position="top"
+      [style]="{ width: '100vw', margin: '0' }"
+      styleClass="cal__filter-dialog"
+    >
+      @if (campuses().length > 1) {
+        <div class="cal__mobile-filter-row">
+          <label class="cal__mobile-filter-label">分校</label>
+          <p-select
+            [options]="campuses()"
+            optionLabel="name"
+            optionValue="id"
+            placeholder="選擇分校"
+            [appendTo]="'body'"
+            [filter]="true"
+            filterBy="name"
+            [ngModel]="selectedCampusId()"
+            (ngModelChange)="onCampusChange($event)"
+            styleClass="w-full"
+          />
+        </div>
+      }
+      @if (selectedCampusId() && availableCourses().length > 0) {
+        <div class="cal__mobile-filter-row">
+          <label class="cal__mobile-filter-label">課程</label>
+          <p-select
+            [options]="availableCourses()"
+            optionLabel="name"
+            optionValue="id"
+            placeholder="所有課程"
+            [appendTo]="'body'"
+            [filter]="true"
+            filterBy="name"
+            [showClear]="true"
+            [ngModel]="selectedCourseId()"
+            (ngModelChange)="onCourseChange($event)"
+            styleClass="w-full"
+          />
+        </div>
+      }
+      @if (selectedCampusId() && availableTeachers().length > 0) {
+        <div class="cal__mobile-filter-row">
+          <label class="cal__mobile-filter-label">老師</label>
+          <p-multiselect
+            [options]="availableTeachers()"
+            optionLabel="displayName"
+            optionValue="id"
+            placeholder="所有老師"
+            selectedItemsLabel="{0} 位老師"
+            [appendTo]="'body'"
+            [filter]="true"
+            filterPlaceholder="搜尋老師..."
+            [ngModel]="selectedTeacherIds()"
+            (ngModelChange)="onTeacherIdsChange($event)"
+            styleClass="w-full"
+          />
+        </div>
+      }
+      @if (selectedCampusId() && availableClasses().length > 0) {
+        <div class="cal__mobile-filter-row">
+          <label class="cal__mobile-filter-label">班級</label>
+          <p-select
+            [options]="availableClasses()"
+            optionLabel="name"
+            optionValue="id"
+            placeholder="所有班級"
+            [appendTo]="'body'"
+            [filter]="true"
+            [showClear]="true"
+            [ngModel]="selectedClassId()"
+            (ngModelChange)="onClassChange($event)"
+            styleClass="w-full"
+          />
+        </div>
+      }
+      @if (hasActiveFilters()) {
+        <div class="cal__mobile-filter-row" style="justify-content: flex-end">
+          <p-button
+            label="清除全部"
+            severity="secondary"
+            [text]="true"
+            size="small"
+            icon="pi pi-times"
+            (onClick)="clearFilters()"
+          />
+        </div>
+      }
+    </p-dialog>
   } @else {
     <!-- Desktop / Calendar: original filters -->
     <div class="cal__filters">

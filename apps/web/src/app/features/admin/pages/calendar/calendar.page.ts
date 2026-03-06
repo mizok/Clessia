@@ -928,6 +928,9 @@ export class CalendarPage implements OnInit, OnDestroy {
       .pipe(debounceTime(150), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
         const isWide = window.innerWidth >= 768;
+        // Close mobile-only dialogs on resize
+        this.showMobileFilters.set(false);
+        this.showBatchSheet.set(false);
         if (this.isWeekView() !== isWide) {
           this.isWeekView.set(isWide);
           // Only reload for calendar view; list view has its own date range
