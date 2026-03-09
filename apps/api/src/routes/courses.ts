@@ -52,6 +52,7 @@ const UpdateCourseSchema = z
     description: z.string().max(500).nullable().optional(),
     isActive: z.boolean().optional(),
     gradeLevels: z.array(z.string()).optional(),
+    deactivateMode: z.enum(['keep_sessions', 'cancel_future_sessions']).optional(),
   })
   .openapi('UpdateCourse');
 
@@ -198,6 +199,14 @@ const getRoute = createRoute({
         },
       },
     },
+    400: {
+      description: '操作失敗',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+    },
   },
 });
 
@@ -324,12 +333,23 @@ const updateRoute = createRoute({
       description: '成功更新課程',
       content: {
         'application/json': {
-          schema: z.object({ data: CourseSchema }),
+          schema: z.object({
+            data: CourseSchema,
+            cancelledFutureSessions: z.number().optional(),
+          }),
         },
       },
     },
     404: {
       description: '課程不存在',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+    },
+    400: {
+      description: '操作失敗',
       content: {
         'application/json': {
           schema: ErrorSchema,
@@ -346,12 +366,26 @@ app.openapi(updateRoute, async (c) => {
   const { id } = c.req.valid('param');
   const body = c.req.valid('json');
 
+  const { data: existingCourse, error: existingCourseError } = await supabase
+    .from('courses')
+    .select('id, is_active')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (existingCourseError || !existingCourse) {
+    return c.json({ error: '課程不存在', code: 'NOT_FOUND' }, 404);
+  }
+
   const updateData: Record<string, unknown> = {};
   if (body.name !== undefined) updateData['name'] = body.name;
   if (body.subjectId !== undefined) updateData['subject_id'] = body.subjectId;
   if (body.description !== undefined) updateData['description'] = body.description;
   if (body.isActive !== undefined) updateData['is_active'] = body.isActive;
   if (body.gradeLevels !== undefined) updateData['grade_levels'] = body.gradeLevels;
+  const shouldCancelFutureSessions =
+    body.isActive === false &&
+    (existingCourse['is_active'] as boolean) &&
+    body.deactivateMode === 'cancel_future_sessions';
 
   const { data, error } = await supabase
     .from('courses')
@@ -364,6 +398,41 @@ app.openapi(updateRoute, async (c) => {
     return c.json({ error: '課程不存在', code: 'NOT_FOUND' }, 404);
   }
 
+  let cancelledFutureSessions = 0;
+  if (shouldCancelFutureSessions) {
+    const { data: classRows, error: classRowsError } = await supabase
+      .from('classes')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('course_id', id);
+
+    if (classRowsError) {
+      return c.json({ error: classRowsError.message, code: 'DB_ERROR' }, 400);
+    }
+
+    const classIds = (classRows ?? [])
+      .map((row) => row['id'] as string | undefined)
+      .filter((classId): classId is string => !!classId);
+
+    if (classIds.length > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      const { data: deletedRows, error: deleteError } = await supabase
+        .from('sessions')
+        .delete()
+        .eq('org_id', orgId)
+        .in('class_id', classIds)
+        .gte('session_date', today)
+        .neq('status', 'completed')
+        .select('id');
+
+      if (deleteError) {
+        return c.json({ error: deleteError.message, code: 'DB_ERROR' }, 400);
+      }
+
+      cancelledFutureSessions = deletedRows?.length ?? 0;
+    }
+  }
+
   logAudit(supabase, {
     orgId,
     userId,
@@ -371,9 +440,19 @@ app.openapi(updateRoute, async (c) => {
     resourceId: id,
     resourceName: data.name as string,
     action: 'update',
+    details: {
+      deactivateMode: body.deactivateMode ?? null,
+      cancelledFutureSessions,
+    },
   }, c.executionCtx.waitUntil.bind(c.executionCtx));
 
-  return c.json({ data: mapCourse(data as Record<string, unknown>) }, 200);
+  return c.json(
+    {
+      data: mapCourse(data as Record<string, unknown>),
+      ...(shouldCancelFutureSessions ? { cancelledFutureSessions } : {}),
+    },
+    200,
+  );
 });
 
 // DELETE /api/courses/:id - 刪除課程

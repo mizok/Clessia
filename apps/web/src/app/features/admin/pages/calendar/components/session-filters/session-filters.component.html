@@ -1,0 +1,128 @@
+<section class="session-filters">
+  @if (viewMode() === 'list') {
+    <div class="session-filters__mobile">
+      <p-datepicker
+        class="session-filters__mobile-date"
+        selectionMode="range"
+        [ngModel]="listDateRange()"
+        (ngModelChange)="onListDateRangeChange($event)"
+        dateFormat="mm/dd"
+        placeholder="日期範圍"
+        [showIcon]="true"
+        [appendTo]="'body'"
+        [firstDayOfWeek]="1"
+        [numberOfMonths]="1"
+        [readonlyInput]="true"
+      />
+      <button class="session-filters__mobile-toggle" (click)="mobileFilterToggle.emit()">
+        <i class="pi pi-filter session-filters__mobile-toggle-icon"></i>
+        篩選
+        @if (activeFilterCount() > 0) {
+          <span class="session-filters__mobile-badge">{{ activeFilterCount() }}</span>
+        }
+      </button>
+    </div>
+  }
+
+  <div class="session-filters__row" [class.session-filters__row--list]="viewMode() === 'list'">
+    @if (viewMode() === 'list') {
+      <p-datepicker
+        class="session-filters__control session-filters__control--date-range"
+        selectionMode="range"
+        [ngModel]="listDateRange()"
+        (ngModelChange)="onListDateRangeChange($event)"
+        dateFormat="yy/mm/dd"
+        placeholder="選擇日期範圍"
+        [showIcon]="true"
+        [appendTo]="'body'"
+        [firstDayOfWeek]="1"
+        [numberOfMonths]="1"
+        [readonlyInput]="true"
+      />
+    }
+    @if (campuses().length > 1) {
+      <p-select
+        class="session-filters__control"
+        [options]="campuses()"
+        optionLabel="name"
+        optionValue="id"
+        placeholder="選擇分校"
+        [appendTo]="'body'"
+        [filter]="true"
+        filterBy="name"
+        [ngModel]="selectedCampusId()"
+        (ngModelChange)="onCampusSelectChange($event)"
+      />
+    }
+    @if (selectedCampusId() && availableCourses().length > 0) {
+      <p-select
+        class="session-filters__control"
+        [options]="availableCourses()"
+        optionLabel="name"
+        optionValue="id"
+        placeholder="所有課程"
+        [appendTo]="'body'"
+        [filter]="true"
+        filterBy="name"
+        [showClear]="true"
+        [ngModel]="selectedCourseId()"
+        (ngModelChange)="onCourseSelectChange($event)"
+      />
+    }
+    @if (selectedCampusId() && filteredTeachers().length > 0) {
+      @if (viewMode() === 'list') {
+        <p-multiselect
+          class="session-filters__control"
+          [options]="filteredTeachers()"
+          optionLabel="displayName"
+          optionValue="id"
+          placeholder="所有老師"
+          selectedItemsLabel="{0} 位老師"
+          [appendTo]="'body'"
+          [filter]="true"
+          filterPlaceholder="搜尋老師..."
+          [ngModel]="selectedTeacherIds()"
+          (ngModelChange)="onTeacherMultiChange($event)"
+        />
+      } @else {
+        <p-select
+          class="session-filters__control"
+          [options]="filteredTeachers()"
+          optionLabel="displayName"
+          optionValue="id"
+          placeholder="所有老師"
+          [appendTo]="'body'"
+          [filter]="true"
+          filterBy="displayName"
+          [showClear]="true"
+          [ngModel]="singleTeacherId()"
+          (ngModelChange)="onTeacherSingleChange($event)"
+        />
+      }
+    }
+    @if (selectedCampusId() && selectedCourseId() && availableClasses().length > 0) {
+      <p-select
+        class="session-filters__control"
+        [options]="availableClasses()"
+        optionLabel="name"
+        optionValue="id"
+        placeholder="所有班級"
+        [appendTo]="'body'"
+        [filter]="true"
+        [showClear]="true"
+        [ngModel]="selectedClassId()"
+        (ngModelChange)="onClassSelectChange($event)"
+      />
+    }
+    @if (hasActiveFilters()) {
+      <p-button
+        label="清除"
+        severity="secondary"
+        [text]="true"
+        size="small"
+        icon="pi pi-times"
+        (onClick)="clearFilters.emit()"
+      />
+    }
+  </div>
+</section>

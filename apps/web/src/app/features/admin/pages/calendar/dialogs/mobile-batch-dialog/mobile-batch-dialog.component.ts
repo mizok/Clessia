@@ -12,19 +12,18 @@ import { SelectModule } from 'primeng/select';
 import { InputTextModule } from 'primeng/inputtext';
 import { DynamicDialogConfig, DynamicDialogRef } from 'primeng/dynamicdialog';
 import { MessageService } from 'primeng/api';
-import {
-  SessionsService,
-  type BatchAssignResult,
-  type BatchActionResult,
-} from '@core/sessions.service';
+import type { BatchActionResult, BatchAssignResult } from '@core/sessions.service';
 import type { Staff } from '@core/staff.service';
+import { CalendarActionsService } from '../../services/calendar-actions.service';
 
-type BatchMode = 'assign' | 'time' | 'cancel' | 'uncancel';
+export type MobileBatchMode = 'assign' | 'time' | 'cancel' | 'uncancel';
 
 export interface MobileBatchDialogData {
   readonly sessionIds: string[];
   readonly selectedCount: number;
   readonly teachers: Staff[];
+  readonly hasCancelledSelection: boolean;
+  readonly initialMode: MobileBatchMode | null;
 }
 
 export interface MobileBatchDialogResult {
@@ -42,14 +41,15 @@ export interface MobileBatchDialogResult {
 export class MobileBatchDialogComponent implements OnInit {
   private readonly config = inject(DynamicDialogConfig<MobileBatchDialogData>);
   private readonly ref = inject(DynamicDialogRef);
-  private readonly sessionsService = inject(SessionsService);
+  private readonly calendarActionsService = inject(CalendarActionsService);
   private readonly messageService = inject(MessageService);
 
   protected readonly teachers = signal<Staff[]>([]);
   protected readonly sessionIds = signal<string[]>([]);
   protected readonly selectedCount = signal(0);
+  protected readonly hasCancelledSelection = signal(false);
 
-  protected readonly batchMode = signal<BatchMode | null>(null);
+  protected readonly batchMode = signal<MobileBatchMode | null>(null);
   protected readonly batchTeacherId = signal<string | null>(null);
   protected readonly batchStartTime = signal('09:00');
   protected readonly batchEndTime = signal('11:00');
@@ -77,9 +77,13 @@ export class MobileBatchDialogComponent implements OnInit {
     this.sessionIds.set([...data.sessionIds]);
     this.selectedCount.set(data.selectedCount);
     this.teachers.set(data.teachers);
+    this.hasCancelledSelection.set(data.hasCancelledSelection);
+    if (data.initialMode && (data.initialMode !== 'uncancel' || data.hasCancelledSelection)) {
+      this.batchMode.set(data.initialMode);
+    }
   }
 
-  protected selectAction(mode: BatchMode): void {
+  protected selectAction(mode: MobileBatchMode): void {
     this.batchMode.set(mode);
     this.batchPreview.set(null);
   }
@@ -96,7 +100,7 @@ export class MobileBatchDialogComponent implements OnInit {
     if (ids.length === 0) return;
     this.batchLoading.set(true);
 
-    const obs = this.buildObs(true);
+    const obs = this.calendarActionsService.previewBatch(this.toBatchRequest());
     if (!obs) return;
 
     obs.subscribe({
@@ -116,7 +120,7 @@ export class MobileBatchDialogComponent implements OnInit {
     if (ids.length === 0) return;
     this.batchLoading.set(true);
 
-    const obs = this.buildObs(false);
+    const obs = this.calendarActionsService.applyBatch(this.toBatchRequest());
     if (!obs) return;
 
     obs.subscribe({
@@ -137,34 +141,14 @@ export class MobileBatchDialogComponent implements OnInit {
     });
   }
 
-  private buildObs(
-    dryRun: boolean,
-  ): import('rxjs').Observable<BatchAssignResult | BatchActionResult> | null {
-    const ids = this.sessionIds();
-    switch (this.batchMode()) {
-      case 'assign':
-        return this.sessionsService.batchAssignTeacher({
-          sessionIds: ids,
-          teacherId: this.batchTeacherId()!,
-          dryRun,
-        });
-      case 'time':
-        return this.sessionsService.batchUpdateTime({
-          sessionIds: ids,
-          startTime: this.batchStartTime(),
-          endTime: this.batchEndTime(),
-          dryRun,
-        });
-      case 'cancel':
-        return this.sessionsService.batchCancel({
-          sessionIds: ids,
-          reason: this.batchCancelReason() || undefined,
-          dryRun,
-        });
-      case 'uncancel':
-        return this.sessionsService.batchUncancel({ sessionIds: ids, dryRun });
-      default:
-        return null;
-    }
+  private toBatchRequest() {
+    return {
+      mode: this.batchMode(),
+      sessionIds: this.sessionIds(),
+      teacherId: this.batchTeacherId(),
+      startTime: this.batchStartTime(),
+      endTime: this.batchEndTime(),
+      cancelReason: this.batchCancelReason(),
+    } as const;
   }
 }

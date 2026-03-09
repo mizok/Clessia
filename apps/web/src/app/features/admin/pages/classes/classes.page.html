@@ -282,7 +282,12 @@
                             <a
                               class="class-row__intervention-link"
                               [routerLink]="['/admin/calendar']"
-                              [queryParams]="{ view: 'list', classId: cls.id }"
+                              [queryParams]="{
+                                view: 'list',
+                                classId: cls.id,
+                                campusId: cls.campusId,
+                                courseId: cls.courseId,
+                              }"
                             >
                               <i class="pi pi-exclamation-triangle"></i>
                               {{ cls.upcomingUnassignedCount }} 堂未指派

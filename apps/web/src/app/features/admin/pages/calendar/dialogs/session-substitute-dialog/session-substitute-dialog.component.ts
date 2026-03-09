@@ -7,6 +7,8 @@ import { DynamicDialogConfig, DynamicDialogRef } from 'primeng/dynamicdialog';
 import { MessageService } from 'primeng/api';
 import { Session, SessionsService } from '@core/sessions.service';
 import { StaffService, Staff } from '@core/staff.service';
+import { CoursesService } from '@core/courses.service';
+import { forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-session-substitute-dialog',
@@ -20,6 +22,7 @@ export class SessionSubstituteDialogComponent implements OnInit {
   private readonly ref = inject(DynamicDialogRef);
   private readonly sessionsService = inject(SessionsService);
   private readonly staffService = inject(StaffService);
+  private readonly coursesService = inject(CoursesService);
   private readonly messageService = inject(MessageService);
   private readonly fb = inject(FormBuilder);
 
@@ -41,12 +44,25 @@ export class SessionSubstituteDialogComponent implements OnInit {
   }
 
   private loadTeachers() {
+    const s = this.session();
+    if (!s) {
+      this.teachers.set([]);
+      return;
+    }
+
     this.loadingTeachers.set(true);
-    this.staffService.list({ role: 'teacher' }).subscribe({
-      next: (res) => {
-        // Filter out the original teacher
-        const s = this.session();
-        const available = res.data.filter((t) => t.id !== s?.teacherId);
+    forkJoin({
+      teachersRes: this.staffService.list({ role: 'teacher', campusId: s.campusId }),
+      courseRes: this.coursesService.get(s.courseId),
+    }).subscribe({
+      next: ({ teachersRes, courseRes }) => {
+        const subjectId = courseRes.data.subjectId;
+        const available = teachersRes.data.filter(
+          (teacher) =>
+            teacher.id !== s.teacherId &&
+            teacher.campusIds.includes(s.campusId) &&
+            teacher.subjectIds.includes(subjectId),
+        );
         this.teachers.set(available);
         this.loadingTeachers.set(false);
       },
@@ -81,11 +97,11 @@ export class SessionSubstituteDialogComponent implements OnInit {
           });
           this.ref.close('refresh');
         },
-        error: () => {
+        error: (error: { error?: { error?: string } }) => {
           this.messageService.add({
             severity: 'error',
             summary: '錯誤',
-            detail: '代課安排失敗，請稍後再試',
+            detail: error.error?.error ?? '代課安排失敗，請稍後再試',
           });
           this.isSubmitting.set(false);
         },

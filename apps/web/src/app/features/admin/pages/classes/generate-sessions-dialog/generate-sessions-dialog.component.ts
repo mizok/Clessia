@@ -142,6 +142,8 @@ export class GenerateSessionsDialogComponent {
     this.ref.close({
       action: 'navigate-calendar',
       classId: c?.id,
+      campusId: c?.campusId,
+      courseId: c?.courseId,
       from: from ? format(from, 'yyyy-MM-dd') : undefined,
       to: to ? format(to, 'yyyy-MM-dd') : undefined,
     });

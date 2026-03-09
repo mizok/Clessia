@@ -39,6 +39,12 @@
     color: var(--zinc-800);
   }
 
+  &__hint {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--zinc-500);
+  }
+
   &__time-row {
     display: flex;
     align-items: center;
@@ -76,5 +82,11 @@
     align-items: center;
     justify-content: space-between;
     padding-top: var(--space-2);
+  }
+
+  &__action-hint {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--warn-600);
   }
 }

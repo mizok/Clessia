@@ -123,7 +123,7 @@ export class RoutesCatalog {
   public static readonly ADMIN_CALENDAR = this.register(
     'calendar',
     '/admin/calendar',
-    '課堂行事曆',
+    '課堂安排中心',
     UserType.ADMIN,
     'pi-calendar',
     true,

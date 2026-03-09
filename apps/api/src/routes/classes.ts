@@ -838,15 +838,19 @@ app.openapi(
     const userId = c.get('userId');
     const body = c.req.valid('json');
 
-    // 從 course 取得 campus_id
+    // 從 course 取得 campus_id 與啟用狀態
     const { data: course } = await supabase
       .from('courses')
-      .select('campus_id')
+      .select('campus_id, is_active')
       .eq('id', body.courseId)
+      .eq('org_id', orgId)
       .single();
 
     if (!course) {
       return c.json({ error: '課程不存在', code: 'COURSE_NOT_FOUND' }, 400);
+    }
+    if (!(course.is_active as boolean)) {
+      return c.json({ error: '課程已停用，無法新增班級', code: 'COURSE_INACTIVE' }, 409);
     }
 
     const { data, error } = await supabase
@@ -1268,6 +1272,14 @@ app.openapi(
           'application/json': { schema: z.object({ data: z.array(SessionPreviewSchema) }) },
         },
       },
+      404: {
+        description: '班級不存在',
+        content: { 'application/json': { schema: ErrorSchema } },
+      },
+      409: {
+        description: '班級或課程已停用',
+        content: { 'application/json': { schema: ErrorSchema } },
+      },
       400: {
         description: '參數錯誤',
         content: { 'application/json': { schema: ErrorSchema } },
@@ -1276,6 +1288,7 @@ app.openapi(
   }),
   async (c) => {
     const supabase = c.get('supabase');
+    const orgId = c.get('orgId');
     const { id } = c.req.valid('param');
     const { from, to, excludeDates, includeUnassigned } = c.req.valid('query');
 
@@ -1288,6 +1301,31 @@ app.openapi(
 
     const includeUnassignedValue = includeUnassigned !== 'false';
     const excludeSet = new Set(excludeDates ? excludeDates.split(',').filter(Boolean) : []);
+
+    const { data: cls, error: clsError } = await supabase
+      .from('classes')
+      .select('id, is_active, courses(id, is_active)')
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .maybeSingle();
+
+    if (clsError) {
+      return c.json({ error: clsError.message, code: 'DB_ERROR' }, 400);
+    }
+    if (!cls) {
+      return c.json({ error: '班級不存在', code: 'NOT_FOUND' }, 404);
+    }
+    if (!(cls.is_active as boolean)) {
+      return c.json({ error: '班級已停用，無法新增未來課程排程', code: 'CLASS_INACTIVE' }, 409);
+    }
+    const linkedCourseRaw = cls.courses as
+      | { id?: string; is_active?: boolean | null }
+      | Array<{ id?: string; is_active?: boolean | null }>
+      | null;
+    const linkedCourse = Array.isArray(linkedCourseRaw) ? linkedCourseRaw[0] : linkedCourseRaw;
+    if (linkedCourse && linkedCourse.is_active === false) {
+      return c.json({ error: '課程已停用，無法新增未來課程排程', code: 'COURSE_INACTIVE' }, 409);
+    }
 
     const { data: schedules } = await supabase
       .from('schedules')
@@ -1367,6 +1405,14 @@ app.openapi(
           },
         },
       },
+      404: {
+        description: '班級不存在',
+        content: { 'application/json': { schema: ErrorSchema } },
+      },
+      409: {
+        description: '班級或課程已停用',
+        content: { 'application/json': { schema: ErrorSchema } },
+      },
       400: {
         description: '參數錯誤',
         content: { 'application/json': { schema: ErrorSchema } },
@@ -1388,6 +1434,31 @@ app.openapi(
 
     const excludeSet = new Set(excludeDates ?? []);
     const includeUnassignedValue = includeUnassigned ?? true;
+
+    const { data: cls, error: clsError } = await supabase
+      .from('classes')
+      .select('id, is_active, courses(id, is_active)')
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .maybeSingle();
+
+    if (clsError) {
+      return c.json({ error: clsError.message, code: 'DB_ERROR' }, 400);
+    }
+    if (!cls) {
+      return c.json({ error: '班級不存在', code: 'NOT_FOUND' }, 404);
+    }
+    if (!(cls.is_active as boolean)) {
+      return c.json({ error: '班級已停用，無法新增未來課程排程', code: 'CLASS_INACTIVE' }, 409);
+    }
+    const linkedCourseRaw = cls.courses as
+      | { id?: string; is_active?: boolean | null }
+      | Array<{ id?: string; is_active?: boolean | null }>
+      | null;
+    const linkedCourse = Array.isArray(linkedCourseRaw) ? linkedCourseRaw[0] : linkedCourseRaw;
+    if (linkedCourse && linkedCourse.is_active === false) {
+      return c.json({ error: '課程已停用，無法新增未來課程排程', code: 'COURSE_INACTIVE' }, 409);
+    }
 
     const { data: schedules } = await supabase.from('schedules').select('*').eq('class_id', id);
 
@@ -2363,7 +2434,7 @@ app.openapi(
     method: 'post',
     path: '/{id}/cancel-future-sessions',
     tags: ['Classes'],
-    summary: '取消此班級所有未來已排定的課堂',
+    summary: '取消（刪除）此班級所有未來課堂排程',
     request: { params: z.object({ id: z.uuid() }) },
     responses: {
       200: {
@@ -2393,19 +2464,19 @@ app.openapi(
 
     const today = new Date().toISOString().split('T')[0];
 
-    const { data: updated, error } = await supabase
+    const { data: deleted, error } = await supabase
       .from('sessions')
-      .update({ status: 'cancelled' })
+      .delete()
       .eq('class_id', id)
       .gte('session_date', today)
-      .eq('status', 'scheduled')
+      .neq('status', 'completed')
       .select('id');
 
     if (error) {
       return c.json({ error: error.message, code: 'DB_ERROR' }, 404);
     }
 
-    return c.json({ cancelled: updated?.length ?? 0 }, 200);
+    return c.json({ cancelled: deleted?.length ?? 0 }, 200);
   },
 );
 

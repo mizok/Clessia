@@ -41,14 +41,28 @@ export class SessionDetailDialogComponent implements OnInit {
     const s = this.session();
     if (!s) return '';
     if (s.status === 'cancelled') return '已停課';
-    return s.hasChanges ? '已調整' : '正常';
+    if (s.status === 'completed') return '已完成';
+    return '已排課';
   });
 
   readonly statusSeverity = computed(() => {
     const s = this.session();
     if (!s) return 'info';
     if (s.status === 'cancelled') return 'secondary';
-    return s.hasChanges ? 'warn' : 'success';
+    if (s.status === 'completed') return 'success';
+    return 'info';
+  });
+
+  readonly adjustmentLabel = computed(() => {
+    const s = this.session();
+    if (!s) return '';
+    return s.hasChanges ? '有異動' : '無異動';
+  });
+
+  readonly adjustmentSeverity = computed(() => {
+    const s = this.session();
+    if (!s) return 'secondary';
+    return s.hasChanges ? 'warn' : 'secondary';
   });
 
   readonly canOperate = computed(() => {

@@ -121,6 +121,7 @@ export class ResponsiveTableComponent {
   });
 
   private resizeObserver?: ResizeObserver;
+  private removeWindowResizeListener: (() => void) | null = null;
   private expandHeaderCell: HTMLTableCellElement | null = null;
 
   constructor() {
@@ -132,6 +133,8 @@ export class ResponsiveTableComponent {
 
     this.destroyRef.onDestroy(() => {
       this.resizeObserver?.disconnect();
+      this.removeWindowResizeListener?.();
+      this.removeWindowResizeListener = null;
       this.removeExpandHeaderCell();
     });
 
@@ -254,7 +257,15 @@ export class ResponsiveTableComponent {
     const containerElement = this.containerRef().nativeElement;
     this.containerWidth.set(Math.max(containerElement.getBoundingClientRect().width, 0));
 
-    this.resizeObserver = new ResizeObserver((entries) => {
+    const ResizeObserverCtor = globalThis.ResizeObserver;
+    if (typeof ResizeObserverCtor !== 'function') {
+      this.removeWindowResizeListener = this.renderer.listen('window', 'resize', () => {
+        this.containerWidth.set(Math.max(containerElement.getBoundingClientRect().width, 0));
+      });
+      return;
+    }
+
+    this.resizeObserver = new ResizeObserverCtor((entries) => {
       const latestWidth = entries[0]?.contentRect.width ?? Number.POSITIVE_INFINITY;
       this.containerWidth.set(latestWidth);
     });

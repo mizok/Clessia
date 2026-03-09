@@ -52,7 +52,7 @@
       />
     </div>
   }
-  @if (selectedCampusId() && availableClasses().length > 0) {
+  @if (selectedCampusId() && selectedCourseId() && availableClasses().length > 0) {
     <div class="mobile-filter-dialog__row">
       <label class="mobile-filter-dialog__label">班級</label>
       <p-select

@@ -22,6 +22,9 @@
         </div>
       </ng-template>
     </p-select>
+    @if (!loadingTeachers() && teachers().length === 0) {
+      <p class="cal-op-form__hint">目前沒有符合該課堂分校與科目的代課老師。</p>
+    }
   </div>
   <div class="cal-op-form__field">
     <label for="substituteReason" class="cal-op-form__label">代課原因（選填）</label>

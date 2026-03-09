@@ -260,6 +260,6 @@
   .shell-content {
     padding: var(--space-3);
     // Ensure bottom padding for bottom bar interaction if needed
-    padding-bottom: calc(var(--space-4) + 64px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
   }
 }

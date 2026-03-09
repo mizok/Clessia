@@ -15,6 +15,7 @@ import {
   Course,
   CreateCourseInput,
   UpdateCourseInput,
+  type UpdateCourseResult,
 } from '@core/courses.service';
 import { Campus } from '@core/campuses.service';
 import { Subject } from '@core/subjects.service';
@@ -54,9 +55,18 @@ export class CourseFormDialogComponent {
     description: this.course()?.description ?? '',
     isActive: this.course()?.isActive ?? true,
     gradeLevels: this.course()?.gradeLevels ?? [],
+    deactivateMode: 'keep_sessions' as 'keep_sessions' | 'cancel_future_sessions',
   });
 
   protected readonly isEditing = computed(() => this.course() !== null);
+  protected readonly shouldShowDeactivateMode = computed(
+    () => this.isEditing() && !!this.course()?.isActive && !this.formData().isActive,
+  );
+
+  protected readonly deactivateModeOptions = [
+    { label: '停用課程（保留既有課堂）', value: 'keep_sessions' as const },
+    { label: '停用並取消未來課堂', value: 'cancel_future_sessions' as const },
+  ];
 
   protected readonly campusOptions = computed(() =>
     this.campuses()
@@ -111,14 +121,17 @@ export class CourseFormDialogComponent {
         description: form.description.trim() || null,
         isActive: form.isActive,
         gradeLevels: form.gradeLevels,
+        ...(this.shouldShowDeactivateMode() ? { deactivateMode: form.deactivateMode } : {}),
       };
 
       this.coursesService.update(this.course()!.id, input).subscribe({
-        next: (res) => {
+        next: (res: UpdateCourseResult) => {
+          const cancelledCount = res.cancelledFutureSessions ?? 0;
+          const detail = this.buildUpdateSuccessDetail(form.name, form.isActive, form.deactivateMode, cancelledCount);
           this.messageService.add({
             severity: 'success',
             summary: '更新成功',
-            detail: `「${form.name}」已更新`,
+            detail,
           });
           this.ref.close(res.data);
         },
@@ -169,6 +182,14 @@ export class CourseFormDialogComponent {
     this.formData.update((f) => ({ ...f, [field]: value }));
   }
 
+  protected onStatusChange(isActive: boolean): void {
+    this.formData.update((f) => ({
+      ...f,
+      isActive,
+      deactivateMode: isActive ? 'keep_sessions' : f.deactivateMode,
+    }));
+  }
+
   protected openSubjectManager(): void {
     const dialogRef = this.dialogService.open(SubjectManagerComponent, {
       header: '管理科目',
@@ -184,5 +205,21 @@ export class CourseFormDialogComponent {
         }
       });
     }
+  }
+
+  private buildUpdateSuccessDetail(
+    courseName: string,
+    isActive: boolean,
+    deactivateMode: 'keep_sessions' | 'cancel_future_sessions',
+    cancelledCount: number,
+  ): string {
+    if (!isActive && deactivateMode === 'cancel_future_sessions') {
+      if (cancelledCount > 0) {
+        return `「${courseName}」已停用，已取消 ${cancelledCount} 堂未來課堂`;
+      }
+      return `「${courseName}」已停用，沒有可取消的未來課堂`;
+    }
+
+    return `「${courseName}」已更新`;
   }
 }

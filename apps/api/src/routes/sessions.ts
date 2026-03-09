@@ -299,11 +299,14 @@ async function loadSessionOperationState(
   assignmentStatus: 'assigned' | 'unassigned';
   status: 'scheduled' | 'completed' | 'cancelled';
   classId: string;
+  sessionDate: string;
+  startTime: string;
+  endTime: string;
   teacherId: string | null;
 } | null> {
   const { data, error } = await supabase
     .from('sessions')
-    .select('status, assignment_status, teacher_id, class_id')
+    .select('status, assignment_status, teacher_id, class_id, session_date, start_time, end_time')
     .eq('org_id', orgId)
     .eq('id', id)
     .maybeSingle();
@@ -318,6 +321,9 @@ async function loadSessionOperationState(
     assignmentStatus,
     status: data.status as 'scheduled' | 'completed' | 'cancelled',
     classId: data.class_id as string,
+    sessionDate: data.session_date as string,
+    startTime: data.start_time as string,
+    endTime: data.end_time as string,
     teacherId: (data.teacher_id as string | null) ?? null,
   };
 }
@@ -536,7 +542,7 @@ const cancelSessionRoute = createRoute({
       },
     },
     409: {
-      description: '課堂未指派老師',
+      description: '課堂狀態不可停課',
       content: {
         'application/json': {
           schema: ErrorSchema,
@@ -565,16 +571,8 @@ app.openapi(cancelSessionRoute, async (c) => {
   if (!sessionState) {
     return c.json({ error: '課堂不存在', code: 'NOT_FOUND' }, 404);
   }
-  try {
-    assertSessionOperable(sessionState);
-  } catch (error) {
-    if (error instanceof SessionUnassignedError) {
-      return c.json({ error: error.message, code: error.code }, 409);
-    }
-    if (error instanceof SessionCancelledError || error instanceof SessionCompletedError) {
-      return c.json({ error: error.message, code: error.code }, 409);
-    }
-    throw error;
+  if (sessionState.status !== 'scheduled') {
+    return c.json({ error: '僅可停課狀態為「scheduled」的課堂', code: 'STATUS_NOT_CANCELLABLE' }, 409);
   }
 
   const { data: updatedSession, error: updateError } = await supabase
@@ -689,6 +687,140 @@ app.openapi(substituteSessionRoute, async (c) => {
       return c.json({ error: error.message, code: error.code }, 409);
     }
     throw error;
+  }
+
+  if (sessionState.teacherId === body.substituteTeacherId) {
+    return c.json({ error: '代課老師不可與原老師相同', code: 'INVALID_SUBSTITUTE_TEACHER' }, 400);
+  }
+
+  const [
+    { data: classRow, error: classRowError },
+    { data: teacherSubjectRows, error: teacherSubjectRowsError },
+    { data: teacherCampusRows, error: teacherCampusRowsError },
+    { data: teacherRow, error: teacherRowError },
+  ] = await Promise.all([
+    supabase
+      .from('classes')
+      .select('course_id, campus_id')
+      .eq('org_id', orgId)
+      .eq('id', sessionState.classId)
+      .maybeSingle(),
+    supabase
+      .from('staff_subjects')
+      .select('subject_id')
+      .eq('staff_id', body.substituteTeacherId),
+    supabase
+      .from('staff_campuses')
+      .select('campus_id')
+      .eq('staff_id', body.substituteTeacherId),
+    supabase
+      .from('staff')
+      .select('id, user_id, is_active')
+      .eq('org_id', orgId)
+      .eq('id', body.substituteTeacherId)
+      .maybeSingle(),
+  ]);
+
+  if (classRowError) {
+    return c.json({ error: classRowError.message, code: 'DB_ERROR' }, 400);
+  }
+  if (teacherSubjectRowsError) {
+    return c.json({ error: teacherSubjectRowsError.message, code: 'DB_ERROR' }, 400);
+  }
+  if (teacherCampusRowsError) {
+    return c.json({ error: teacherCampusRowsError.message, code: 'DB_ERROR' }, 400);
+  }
+  if (teacherRowError) {
+    return c.json({ error: teacherRowError.message, code: 'DB_ERROR' }, 400);
+  }
+
+  const classCourseId = classRow?.['course_id'] as string | undefined;
+  const classCampusId = classRow?.['campus_id'] as string | undefined;
+  if (!classCourseId || !classCampusId || !teacherRow) {
+    return c.json({ error: '代課老師不符合課程科目或分校資格', code: 'TEACHER_NOT_ELIGIBLE' }, 409);
+  }
+
+  const substituteTeacherUserId = teacherRow['user_id'] as string | undefined;
+  const substituteTeacherActive = (teacherRow['is_active'] as boolean | null) ?? false;
+  if (!substituteTeacherUserId || !substituteTeacherActive) {
+    return c.json({ error: '代課老師不符合課程科目或分校資格', code: 'TEACHER_NOT_ELIGIBLE' }, 409);
+  }
+
+  const { data: substituteTeacherRole, error: substituteTeacherRoleError } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', substituteTeacherUserId)
+    .eq('role', 'teacher')
+    .maybeSingle();
+
+  if (substituteTeacherRoleError) {
+    return c.json({ error: substituteTeacherRoleError.message, code: 'DB_ERROR' }, 400);
+  }
+
+  if (!substituteTeacherRole) {
+    return c.json({ error: '代課老師不符合課程科目或分校資格', code: 'TEACHER_NOT_ELIGIBLE' }, 409);
+  }
+
+  const { data: courseRow, error: courseRowError } = await supabase
+    .from('courses')
+    .select('subject_id')
+    .eq('org_id', orgId)
+    .eq('id', classCourseId)
+    .maybeSingle();
+
+  if (courseRowError) {
+    return c.json({ error: courseRowError.message, code: 'DB_ERROR' }, 400);
+  }
+
+  const courseSubjectId = courseRow?.['subject_id'] as string | undefined;
+  if (!courseSubjectId) {
+    return c.json({ error: '代課老師不符合課程科目或分校資格', code: 'TEACHER_NOT_ELIGIBLE' }, 409);
+  }
+
+  const teacherSubjectIds = new Set<string>();
+  for (const row of teacherSubjectRows ?? []) {
+    const subjectId = row['subject_id'] as string | undefined;
+    if (subjectId) {
+      teacherSubjectIds.add(subjectId);
+    }
+  }
+  const teacherCampusIds = new Set<string>();
+  for (const row of teacherCampusRows ?? []) {
+    const campusId = row['campus_id'] as string | undefined;
+    if (campusId) {
+      teacherCampusIds.add(campusId);
+    }
+  }
+
+  if (!teacherSubjectIds.has(courseSubjectId) || !teacherCampusIds.has(classCampusId)) {
+    return c.json({ error: '代課老師不符合課程科目或分校資格', code: 'TEACHER_NOT_ELIGIBLE' }, 409);
+  }
+
+  const { data: teacherConflictRows, error: teacherConflictError } = await supabase
+    .from('sessions')
+    .select('id, start_time, end_time')
+    .eq('org_id', orgId)
+    .eq('teacher_id', body.substituteTeacherId)
+    .eq('session_date', sessionState.sessionDate)
+    .eq('status', 'scheduled')
+    .neq('id', id);
+
+  if (teacherConflictError) {
+    return c.json({ error: teacherConflictError.message, code: 'DB_ERROR' }, 400);
+  }
+
+  const substituteStartTime = normalizeTime(sessionState.startTime);
+  const substituteEndTime = normalizeTime(sessionState.endTime);
+  const teacherConflict = (teacherConflictRows ?? []).find((peer) =>
+    isTimeOverlap(
+      substituteStartTime,
+      substituteEndTime,
+      normalizeTime(peer.start_time as string),
+      normalizeTime(peer.end_time as string),
+    ),
+  );
+  if (teacherConflict) {
+    return c.json({ error: '老師於此時段已有其他課堂', code: 'TEACHER_CONFLICT' }, 409);
   }
 
   const { data: updatedSession, error: updateError } = await supabase
@@ -960,7 +1092,7 @@ app.openapi(batchAssignTeacherRoute, async (c) => {
 
   const { data: sessionRows, error: sessionRowsError } = await supabase
     .from('sessions')
-    .select('id, session_date, start_time, end_time, status, assignment_status, teacher_id')
+    .select('id, class_id, session_date, start_time, end_time, status, assignment_status, teacher_id')
     .eq('org_id', orgId)
     .in('id', uniqueSessionIds);
 
@@ -970,6 +1102,7 @@ app.openapi(batchAssignTeacherRoute, async (c) => {
 
   const targetSessions = (sessionRows ?? []) as Array<{
     id: string;
+    class_id: string;
     session_date: string;
     start_time: string;
     end_time: string;
@@ -989,6 +1122,149 @@ app.openapi(batchAssignTeacherRoute, async (c) => {
       },
       200,
     );
+  }
+
+  const targetClassIds = [...new Set(targetSessions.map((session) => session.class_id))];
+  const [
+    { data: classRows, error: classRowsError },
+    { data: teacherSubjectRows, error: teacherSubjectRowsError },
+    { data: teacherCampusRows, error: teacherCampusRowsError },
+    { data: teacherRow, error: teacherRowError },
+  ] =
+    await Promise.all([
+      supabase
+        .from('classes')
+        .select('id, course_id, campus_id')
+        .eq('org_id', orgId)
+        .in('id', targetClassIds),
+      supabase
+        .from('staff_subjects')
+        .select('subject_id')
+        .eq('staff_id', body.teacherId),
+      supabase
+        .from('staff_campuses')
+        .select('campus_id')
+        .eq('staff_id', body.teacherId),
+      supabase
+        .from('staff')
+        .select('id, user_id, is_active')
+        .eq('org_id', orgId)
+        .eq('id', body.teacherId)
+        .maybeSingle(),
+    ]);
+
+  if (classRowsError) {
+    return c.json({ error: classRowsError.message, code: 'DB_ERROR' }, 400);
+  }
+  if (teacherSubjectRowsError) {
+    return c.json({ error: teacherSubjectRowsError.message, code: 'DB_ERROR' }, 400);
+  }
+  if (teacherCampusRowsError) {
+    return c.json({ error: teacherCampusRowsError.message, code: 'DB_ERROR' }, 400);
+  }
+  if (teacherRowError) {
+    return c.json({ error: teacherRowError.message, code: 'DB_ERROR' }, 400);
+  }
+  if (!teacherRow) {
+    return c.json(
+      {
+        updated: 0,
+        skippedConflicts: 0,
+        skippedNotEligible: uniqueSessionIds.length,
+        conflicts: [],
+        dryRun,
+      },
+      200,
+    );
+  }
+
+  const batchTeacherUserId = teacherRow['user_id'] as string | undefined;
+  const batchTeacherActive = (teacherRow['is_active'] as boolean | null) ?? false;
+  if (!batchTeacherUserId || !batchTeacherActive) {
+    return c.json(
+      {
+        updated: 0,
+        skippedConflicts: 0,
+        skippedNotEligible: uniqueSessionIds.length,
+        conflicts: [],
+        dryRun,
+      },
+      200,
+    );
+  }
+
+  const { data: batchTeacherRole, error: batchTeacherRoleError } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', batchTeacherUserId)
+    .eq('role', 'teacher')
+    .maybeSingle();
+
+  if (batchTeacherRoleError) {
+    return c.json({ error: batchTeacherRoleError.message, code: 'DB_ERROR' }, 400);
+  }
+  if (!batchTeacherRole) {
+    return c.json(
+      {
+        updated: 0,
+        skippedConflicts: 0,
+        skippedNotEligible: uniqueSessionIds.length,
+        conflicts: [],
+        dryRun,
+      },
+      200,
+    );
+  }
+
+  const classCourseMap = new Map<string, string>();
+  const classCampusMap = new Map<string, string>();
+  for (const row of classRows ?? []) {
+    const classId = row['id'] as string | undefined;
+    const courseId = row['course_id'] as string | undefined;
+    const campusId = row['campus_id'] as string | undefined;
+    if (classId && courseId) {
+      classCourseMap.set(classId, courseId);
+    }
+    if (classId && campusId) {
+      classCampusMap.set(classId, campusId);
+    }
+  }
+
+  const courseIds = [...new Set([...classCourseMap.values()])];
+  const courseSubjectMap = new Map<string, string>();
+  if (courseIds.length > 0) {
+    const { data: courseRows, error: courseRowsError } = await supabase
+      .from('courses')
+      .select('id, subject_id')
+      .eq('org_id', orgId)
+      .in('id', courseIds);
+
+    if (courseRowsError) {
+      return c.json({ error: courseRowsError.message, code: 'DB_ERROR' }, 400);
+    }
+
+    for (const row of courseRows ?? []) {
+      const courseId = row['id'] as string | undefined;
+      const subjectId = row['subject_id'] as string | null | undefined;
+      if (courseId && subjectId) {
+        courseSubjectMap.set(courseId, subjectId);
+      }
+    }
+  }
+
+  const teacherSubjectIds = new Set<string>();
+  for (const row of teacherSubjectRows ?? []) {
+    const subjectId = row['subject_id'] as string | undefined;
+    if (subjectId) {
+      teacherSubjectIds.add(subjectId);
+    }
+  }
+  const teacherCampusIds = new Set<string>();
+  for (const row of teacherCampusRows ?? []) {
+    const campusId = row['campus_id'] as string | undefined;
+    if (campusId) {
+      teacherCampusIds.add(campusId);
+    }
   }
 
   const sessionDates = targetSessions.map((session) => session.session_date);
@@ -1047,6 +1323,14 @@ app.openapi(batchAssignTeacherRoute, async (c) => {
       continue;
     }
     if (!includeAssigned && assignmentStatus === 'assigned') {
+      skippedNotEligible += 1;
+      continue;
+    }
+
+    const courseId = classCourseMap.get(session.class_id);
+    const subjectId = courseId ? courseSubjectMap.get(courseId) : undefined;
+    const campusId = classCampusMap.get(session.class_id);
+    if (!subjectId || !teacherSubjectIds.has(subjectId) || !campusId || !teacherCampusIds.has(campusId)) {
       skippedNotEligible += 1;
       continue;
     }
@@ -1414,7 +1698,7 @@ app.openapi(batchCancelRoute, async (c) => {
 
   const { data: sessionRows, error: sessionRowsError } = await supabase
     .from('sessions')
-    .select('id, session_date, status')
+    .select('id, class_id, session_date, start_time, end_time, status, teacher_id')
     .eq('org_id', orgId)
     .in('id', uniqueSessionIds);
 
@@ -1424,8 +1708,12 @@ app.openapi(batchCancelRoute, async (c) => {
 
   const targetSessions = (sessionRows ?? []) as Array<{
     id: string;
+    class_id: string;
     session_date: string;
+    start_time: string;
+    end_time: string;
     status: 'scheduled' | 'completed' | 'cancelled';
+    teacher_id: string | null;
   }>;
 
   if (targetSessions.length === 0) {
@@ -1572,7 +1860,7 @@ app.openapi(batchUncancelRoute, async (c) => {
 
   const { data: sessionRows, error: sessionRowsError } = await supabase
     .from('sessions')
-    .select('id, session_date, status')
+    .select('id, class_id, session_date, start_time, end_time, status, teacher_id')
     .eq('org_id', orgId)
     .in('id', uniqueSessionIds);
 
@@ -1582,8 +1870,12 @@ app.openapi(batchUncancelRoute, async (c) => {
 
   const targetSessions = (sessionRows ?? []) as Array<{
     id: string;
+    class_id: string;
     session_date: string;
+    start_time: string;
+    end_time: string;
     status: 'scheduled' | 'completed' | 'cancelled';
+    teacher_id: string | null;
   }>;
 
   if (targetSessions.length === 0) {
@@ -1599,10 +1891,75 @@ app.openapi(batchUncancelRoute, async (c) => {
     );
   }
 
+  const targetDates = [...new Set(targetSessions.map((session) => session.session_date))];
+  const targetClassIds = [...new Set(targetSessions.map((session) => session.class_id))];
+  const targetTeacherIds = [
+    ...new Set(
+      targetSessions
+        .map((session) => session.teacher_id)
+        .filter((teacherId): teacherId is string => !!teacherId),
+    ),
+  ];
+
+  const { data: classDateRows, error: classDateError } = await supabase
+    .from('sessions')
+    .select('id, class_id, session_date, start_time, end_time')
+    .eq('org_id', orgId)
+    .eq('status', 'scheduled')
+    .in('class_id', targetClassIds)
+    .in('session_date', targetDates);
+
+  if (classDateError) {
+    return c.json({ error: classDateError.message, code: 'DB_ERROR' }, 400);
+  }
+
+  const teacherDateResult =
+    targetTeacherIds.length === 0
+      ? { data: [], error: null }
+      : await supabase
+          .from('sessions')
+          .select('id, session_date, start_time, end_time, teacher_id')
+          .eq('org_id', orgId)
+          .eq('status', 'scheduled')
+          .in('teacher_id', targetTeacherIds)
+          .in('session_date', targetDates);
+
+  if (teacherDateResult.error) {
+    return c.json({ error: teacherDateResult.error.message, code: 'DB_ERROR' }, 400);
+  }
+
+  const classPeers = (classDateRows ?? []) as Array<{
+    id: string;
+    class_id: string;
+    session_date: string;
+    start_time: string;
+    end_time: string;
+  }>;
+  const teacherPeers = (teacherDateResult.data ?? []) as Array<{
+    id: string;
+    session_date: string;
+    start_time: string;
+    end_time: string;
+    teacher_id: string | null;
+  }>;
+
   const conflicts: BatchSessionConflictItem[] = [];
   const processableIds: string[] = [];
+  const plannedReopenSlots: Array<{
+    sessionId: string;
+    classId: string;
+    teacherId: string | null;
+    sessionDate: string;
+    startTime: string;
+    endTime: string;
+  }> = [];
+  const sortedTargets = [...targetSessions].sort((a, b) => {
+    const dateCompare = a.session_date.localeCompare(b.session_date);
+    if (dateCompare !== 0) return dateCompare;
+    return normalizeTime(a.start_time).localeCompare(normalizeTime(b.start_time));
+  });
 
-  for (const target of targetSessions) {
+  for (const target of sortedTargets) {
     if (target.status !== 'cancelled') {
       conflicts.push({
         sessionId: target.id,
@@ -1612,7 +1969,96 @@ app.openapi(batchUncancelRoute, async (c) => {
       });
       continue;
     }
+
+    const targetStart = normalizeTime(target.start_time);
+    const targetEnd = normalizeTime(target.end_time);
+
+    const classConflictWithExisting = classPeers.find(
+      (peer) =>
+        peer.id !== target.id &&
+        peer.class_id === target.class_id &&
+        peer.session_date === target.session_date &&
+        isTimeOverlap(targetStart, targetEnd, normalizeTime(peer.start_time), normalizeTime(peer.end_time)),
+    );
+
+    if (classConflictWithExisting) {
+      conflicts.push({
+        sessionId: target.id,
+        sessionDate: target.session_date,
+        reason: 'class_conflict',
+        detail: '同班級於此時段已有課堂',
+        conflictingSessionId: classConflictWithExisting.id,
+      });
+      continue;
+    }
+
+    const classConflictWithPlanned = plannedReopenSlots.find(
+      (slot) =>
+        slot.classId === target.class_id &&
+        slot.sessionDate === target.session_date &&
+        isTimeOverlap(targetStart, targetEnd, slot.startTime, slot.endTime),
+    );
+
+    if (classConflictWithPlanned) {
+      conflicts.push({
+        sessionId: target.id,
+        sessionDate: target.session_date,
+        reason: 'class_conflict',
+        detail: '同班級於此時段已有課堂',
+        conflictingSessionId: classConflictWithPlanned.sessionId,
+      });
+      continue;
+    }
+
+    if (target.teacher_id) {
+      const teacherConflictWithExisting = teacherPeers.find(
+        (peer) =>
+          peer.id !== target.id &&
+          peer.teacher_id === target.teacher_id &&
+          peer.session_date === target.session_date &&
+          isTimeOverlap(targetStart, targetEnd, normalizeTime(peer.start_time), normalizeTime(peer.end_time)),
+      );
+
+      if (teacherConflictWithExisting) {
+        conflicts.push({
+          sessionId: target.id,
+          sessionDate: target.session_date,
+          reason: 'teacher_conflict',
+          detail: '老師於此時段已有其他課堂',
+          conflictingSessionId: teacherConflictWithExisting.id,
+        });
+        continue;
+      }
+
+      const teacherConflictWithPlanned = plannedReopenSlots.find(
+        (slot) =>
+          slot.sessionId !== target.id &&
+          slot.teacherId === target.teacher_id &&
+          slot.sessionDate === target.session_date &&
+          isTimeOverlap(targetStart, targetEnd, slot.startTime, slot.endTime),
+      );
+
+      if (teacherConflictWithPlanned) {
+        conflicts.push({
+          sessionId: target.id,
+          sessionDate: target.session_date,
+          reason: 'teacher_conflict',
+          detail: '老師於此時段已有其他課堂',
+          conflictingSessionId: teacherConflictWithPlanned.sessionId,
+        });
+        continue;
+      }
+    }
+
     processableIds.push(target.id);
+    plannedReopenSlots.push({
+      sessionId: target.id,
+      classId: target.class_id,
+      teacherId: target.teacher_id,
+      sessionDate: target.session_date,
+      startTime: targetStart,
+      endTime: targetEnd,
+    });
   }
 
   const missingCount = uniqueSessionIds.length - targetSessions.length;

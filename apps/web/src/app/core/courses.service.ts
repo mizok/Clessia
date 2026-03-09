@@ -51,6 +51,12 @@ export interface UpdateCourseInput {
   description?: string | null;
   isActive?: boolean;
   gradeLevels?: string[];
+  deactivateMode?: 'keep_sessions' | 'cancel_future_sessions';
+}
+
+export interface UpdateCourseResult {
+  data: Course;
+  cancelledFutureSessions?: number;
 }
 
 @Injectable({
@@ -75,8 +81,8 @@ export class CoursesService {
     return this.http.post<{ data: Course }>(this.endpoint, input);
   }
 
-  update(id: string, input: UpdateCourseInput): Observable<{ data: Course }> {
-    return this.http.put<{ data: Course }>(`${this.endpoint}/${id}`, input);
+  update(id: string, input: UpdateCourseInput): Observable<UpdateCourseResult> {
+    return this.http.put<UpdateCourseResult>(`${this.endpoint}/${id}`, input);
   }
 
   delete(id: string): Observable<{ success: boolean }> {

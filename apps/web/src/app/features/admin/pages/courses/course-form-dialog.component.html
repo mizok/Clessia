@@ -15,7 +15,7 @@
       <div class="form-dialog__switch-row">
         <p-toggleswitch
           [ngModel]="formData().isActive"
-          (ngModelChange)="updateForm('isActive', $event)"
+          (ngModelChange)="onStatusChange($event)"
           [disabled]="loading()"
         />
         <span class="form-dialog__switch-label">
@@ -23,6 +23,27 @@
         </span>
       </div>
     </div>
+    <p class="course-form-dialog__status-hint">
+      停用後不會刪除課程資料，也無法新增未來課程排程。
+    </p>
+    @if (shouldShowDeactivateMode()) {
+      <div class="form-dialog__field">
+        <label class="form-dialog__label">停用模式</label>
+        <p-select
+          [options]="deactivateModeOptions"
+          optionLabel="label"
+          optionValue="value"
+          [ngModel]="formData().deactivateMode"
+          (ngModelChange)="updateForm('deactivateMode', $event)"
+          [appendTo]="'body'"
+          [disabled]="loading()"
+          class="w-full"
+        />
+      </div>
+      <p class="course-form-dialog__mode-hint">
+        選擇「停用並取消未來課堂」會刪除該課程所有未完成的未來課堂排程。
+      </p>
+    }
   }
 
   <!-- Campus -->
@@ -86,6 +107,7 @@
       (ngModelChange)="updateForm('gradeLevels', $event)"
       placeholder="選擇學段（可多選）"
       [disabled]="loading()"
+      [appendTo]="'body'"
       class="w-full"
       display="chip"
     />

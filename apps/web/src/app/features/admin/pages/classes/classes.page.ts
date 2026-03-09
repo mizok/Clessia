@@ -345,6 +345,9 @@ export class ClassesPage implements OnInit {
   }
 
   protected openActionMenu(event: Event, cls: Class, menu: any): void {
+    const course = this.courses().find((item) => item.id === cls.courseId);
+    const canGenerateSessions = Boolean(cls.scheduleCount) && cls.isActive && (course?.isActive ?? true);
+
     this.selectedClassForMenu.set(cls);
     this.classActionMenuItems.set([
       {
@@ -355,7 +358,7 @@ export class ClassesPage implements OnInit {
       {
         label: '產生課堂',
         icon: 'pi pi-calendar-plus',
-        disabled: !cls.scheduleCount,
+        disabled: !canGenerateSessions,
         command: () => this.openGenerateDialog(cls),
       },
       {
@@ -603,8 +606,17 @@ export class ClassesPage implements OnInit {
     });
 
     if (ref)
-      ref.onClose.subscribe((result) => {
-        if (result) this.loadAll();
+      ref.onClose.subscribe((result: Course | undefined) => {
+        if (!result) return;
+        if (!result.isActive && !this.showInactiveCourses()) {
+          this.showInactiveCourses.set(true);
+          this.messageService.add({
+            severity: 'info',
+            summary: '課程已停用',
+            detail: '已自動顯示停用課程，避免在清單中看起來像被刪除',
+          });
+        }
+        this.loadAll();
       });
   }
 
@@ -682,6 +694,24 @@ export class ClassesPage implements OnInit {
   }
 
   protected openGenerateDialog(cls: Class): void {
+    const course = this.courses().find((item) => item.id === cls.courseId);
+    if (!cls.isActive) {
+      this.messageService.add({
+        severity: 'warn',
+        summary: '無法產生課堂',
+        detail: '班級已停用，無法新增未來課程排程',
+      });
+      return;
+    }
+    if (course && !course.isActive) {
+      this.messageService.add({
+        severity: 'warn',
+        summary: '無法產生課堂',
+        detail: '課程已停用，無法新增未來課程排程',
+      });
+      return;
+    }
+
     const ref = this.dialogService.open(GenerateSessionsDialogComponent, {
       header: '產生課堂',
       width: '600px',
@@ -698,6 +728,8 @@ export class ClassesPage implements OnInit {
             queryParams: {
               view: 'list',
               classId: result.classId,
+              campusId: result.campusId,
+              courseId: result.courseId,
               from: result.from,
               to: result.to,
             },
@@ -713,6 +745,8 @@ export class ClassesPage implements OnInit {
       queryParams: {
         view: 'list',
         classId: cls.id,
+        campusId: cls.campusId,
+        courseId: cls.courseId,
       },
     });
   }
