@@ -5,6 +5,12 @@ import { planBatchAssign } from '../domain/session-assignment/batch-assign-plann
 import { buildSessionGenerationPlan } from '../domain/session-assignment/session-generation-planner';
 import { deriveAssignmentStatus } from '../domain/session-assignment/session-assignment.rules';
 import type { BatchAssignMode } from '../domain/session-assignment/session-assignment.types';
+import {
+  normalizeTime,
+  toMinutes,
+  isTimeOverlap,
+  toWeekdayFromString,
+} from '../domain/session-assignment/time-utils';
 
 // ============================================================
 // Schemas
@@ -275,25 +281,6 @@ function mapClass(row: Record<string, unknown>, extras?: ClassExtras) {
   };
 }
 
-function normalizeTime(value: string): string {
-  const [h = '00', m = '00', s = '00'] = value.split(':');
-  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}:${s.padStart(2, '0')}`;
-}
-
-function toWeekday(dateString: string): number {
-  const day = new Date(`${dateString}T00:00:00Z`).getUTCDay();
-  return day === 0 ? 7 : day;
-}
-
-function toMinutes(value: string): number {
-  const [h = '0', m = '0'] = normalizeTime(value).split(':');
-  return Number(h) * 60 + Number(m);
-}
-
-function isTimeOverlap(startA: string, endA: string, startB: string, endB: string): boolean {
-  return toMinutes(startA) < toMinutes(endB) && toMinutes(startB) < toMinutes(endA);
-}
-
 type BatchSessionConflictReason =
   | 'status_not_editable'
   | 'status_not_cancellable'
@@ -308,6 +295,7 @@ interface BatchSessionConflictItem {
   readonly detail: string;
   readonly conflictingSessionId?: string;
 }
+
 
 // ============================================================
 // Routes
@@ -1646,7 +1634,7 @@ app.openapi(
       const sessionStart = normalizeTime(session.start_time as string);
       const sessionEnd = normalizeTime(session.end_time as string);
 
-      if (weekdaySet.size > 0 && !weekdaySet.has(toWeekday(sessionDate))) {
+      if (weekdaySet.size > 0 && !weekdaySet.has(toWeekdayFromString(sessionDate))) {
         return false;
       }
 

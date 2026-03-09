@@ -3,15 +3,7 @@ import type {
   BatchAssignPlanInput,
   BatchAssignPlanOutput,
 } from './session-assignment.types';
-
-function toMinutes(value: string): number {
-  const [h = '0', m = '0'] = value.split(':');
-  return Number(h) * 60 + Number(m);
-}
-
-function isOverlap(startA: string, endA: string, startB: string, endB: string): boolean {
-  return toMinutes(startA) < toMinutes(endB) && toMinutes(startB) < toMinutes(endA);
-}
+import { isTimeOverlap } from './time-utils';
 
 export function planBatchAssign(input: BatchAssignPlanInput): BatchAssignPlanOutput {
   const updatedIds: string[] = [];
@@ -38,7 +30,7 @@ export function planBatchAssign(input: BatchAssignPlanInput): BatchAssignPlanOut
       (busy) =>
         busy.sessionDate === session.sessionDate &&
         busy.sessionId !== session.id &&
-        isOverlap(session.startTime, session.endTime, busy.startTime, busy.endTime),
+        isTimeOverlap(session.startTime, session.endTime, busy.startTime, busy.endTime),
     );
 
     if (sessionConflicts.length > 0) {

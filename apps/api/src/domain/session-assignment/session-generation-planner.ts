@@ -4,11 +4,7 @@ import {
   type SessionGenerationPreviewItem,
 } from './session-assignment.types';
 import { deriveAssignmentStatus, validateAssignmentState } from './session-assignment.rules';
-
-function normalizeTime(value: string): string {
-  const [h = '00', m = '00', s = '00'] = value.split(':');
-  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}:${s.padStart(2, '0')}`;
-}
+import { normalizeTime, toWeekdayFromDate } from './time-utils';
 
 function toUtcDate(value: string): Date {
   return new Date(`${value}T00:00:00Z`);
@@ -16,11 +12,6 @@ function toUtcDate(value: string): Date {
 
 function toDateKey(value: Date): string {
   return value.toISOString().slice(0, 10);
-}
-
-function toWeekday(value: Date): number {
-  const day = value.getUTCDay();
-  return day === 0 ? 7 : day;
 }
 
 export function buildSessionGenerationPlan(
@@ -54,7 +45,7 @@ export function buildSessionGenerationPlan(
   const cursor = new Date(from);
   while (cursor <= to) {
     const sessionDate = toDateKey(cursor);
-    const weekday = toWeekday(cursor);
+    const weekday = toWeekdayFromDate(cursor);
 
     if (input.excludeDates.has(sessionDate)) {
       cursor.setUTCDate(cursor.getUTCDate() + 1);
