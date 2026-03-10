@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 import { CampusesService } from '@core/campuses.service';
@@ -14,6 +14,7 @@ import { SessionAssignDialogComponent } from './dialogs/session-assign-dialog/se
 describe('SessionsPage', () => {
   let component: SessionsPage;
   let fixture: ComponentFixture<SessionsPage>;
+  let router: Router;
   let routeQueryParams: Record<string, string>;
   const sessionsServiceMock = {
     list: vi.fn(() => of({ data: [] })),
@@ -42,6 +43,7 @@ describe('SessionsPage', () => {
     await TestBed.configureTestingModule({
       imports: [SessionsPage],
       providers: [
+        provideRouter([]),
         {
           provide: ActivatedRoute,
           useValue: {
@@ -83,6 +85,7 @@ describe('SessionsPage', () => {
       icon: '',
       showInMenu: true,
     });
+    router = TestBed.inject(Router);
     await fixture.whenStable();
   });
 
@@ -240,7 +243,7 @@ describe('SessionsPage', () => {
     routeQueryParams = {
       campusId: 'campus-1',
       courseId: 'course-1',
-      classId: 'class-1',
+      classIds: 'class-1,class-2',
       from: '2026-02-10',
       to: '2026-06-18',
     };
@@ -266,10 +269,14 @@ describe('SessionsPage', () => {
     const hasActiveFilters = (
       component as unknown as { hasActiveFilters: () => boolean }
     ).hasActiveFilters();
+    const selectedClassIds = (
+      component as unknown as { selectedClassIds: () => string[] }
+    ).selectedClassIds();
 
     expect(listDateRange).toHaveLength(2);
     expect(listDateRange[0]?.toISOString()).toContain('2026-02-10');
     expect(listDateRange[1]?.toISOString()).toContain('2026-06-18');
+    expect(selectedClassIds).toEqual(['class-1', 'class-2']);
     expect(activeFilterCount).toBe(3);
     expect(hasActiveFilters).toBe(true);
   });
@@ -337,5 +344,59 @@ describe('SessionsPage', () => {
       'session-scheduled',
       'session-cancelled',
     ]);
+  });
+
+  it('syncs current filters back to query params', () => {
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    (
+      component as unknown as {
+        selectedCampusIds: { set: (value: string[]) => void };
+        listDateRange: { set: (value: Date[]) => void };
+      }
+    ).selectedCampusIds.set(['campus-1', 'campus-2']);
+    (
+      component as unknown as {
+        listDateRange: { set: (value: Date[]) => void };
+      }
+    ).listDateRange.set([new Date('2026-03-16'), new Date('2026-07-02')]);
+
+    (
+      component as unknown as {
+        onCourseIdsChange: (value: string[]) => void;
+        onStatusesChange: (value: string[] | null) => void;
+      }
+    ).onCourseIdsChange(['course-1']);
+    (
+      component as unknown as {
+        onTeacherIdsChange: (value: string[]) => void;
+      }
+    ).onTeacherIdsChange(['teacher-1', '__unassigned__']);
+    (
+      component as unknown as {
+        onClassChange: (value: string[]) => void;
+      }
+    ).onClassChange(['class-1', 'class-2']);
+    (
+      component as unknown as {
+        onStatusesChange: (value: string[] | null) => void;
+      }
+    ).onStatusesChange([]);
+
+    expect(navigateSpy).toHaveBeenLastCalledWith([], {
+      relativeTo: TestBed.inject(ActivatedRoute),
+      queryParams: {
+        campusIds: 'campus-1,campus-2',
+        courseIds: 'course-1',
+        teacherIds: 'teacher-1',
+        assignmentStatus: 'unassigned',
+        classId: null,
+        classIds: 'class-1,class-2',
+        from: '2026-03-16',
+        to: '2026-07-02',
+        statuses: 'all',
+      },
+      replaceUrl: true,
+    });
   });
 });

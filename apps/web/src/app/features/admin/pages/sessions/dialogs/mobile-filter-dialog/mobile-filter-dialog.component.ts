@@ -8,7 +8,6 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
-import { SelectModule } from 'primeng/select';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { DynamicDialogConfig, DynamicDialogRef } from 'primeng/dynamicdialog';
 import type { Campus } from '@core/campuses.service';
@@ -26,7 +25,7 @@ export interface MobileFilterDialogData {
   readonly selectedCampusIds: string[];
   readonly selectedCourseIds: string[];
   readonly selectedTeacherIds: string[];
-  readonly selectedClassId: string | null;
+  readonly selectedClassIds: string[];
   readonly selectedStatuses: string[];
 }
 
@@ -34,13 +33,22 @@ export interface MobileFilterDialogResult {
   readonly campusIds: string[];
   readonly courseIds: string[];
   readonly teacherIds: string[];
-  readonly classId: string | null;
+  readonly classIds: string[];
   readonly statuses: string[];
+}
+
+interface MobileFilterClassDisplayOption {
+  readonly id: string;
+  readonly name: string;
+  readonly courseId: string;
+  readonly campusId: string;
+  readonly courseName: string | null;
+  readonly campusName: string | null;
 }
 
 @Component({
   selector: 'app-mobile-filter-dialog',
-  imports: [FormsModule, ButtonModule, SelectModule, MultiSelectModule],
+  imports: [FormsModule, ButtonModule, MultiSelectModule],
   templateUrl: './mobile-filter-dialog.component.html',
   styleUrl: './mobile-filter-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,7 +68,7 @@ export class MobileFilterDialogComponent implements OnInit {
   protected readonly selectedCampusIds = signal<string[]>([]);
   protected readonly selectedCourseIds = signal<string[]>([]);
   protected readonly selectedTeacherIds = signal<string[]>([]);
-  protected readonly selectedClassId = signal<string | null>(null);
+  protected readonly selectedClassIds = signal<string[]>([]);
   protected readonly selectedStatuses = signal<string[]>([...DEFAULT_STATUSES]);
 
   protected readonly statusOptions = SESSION_STATUS_OPTIONS;
@@ -124,11 +132,25 @@ export class MobileFilterDialogComponent implements OnInit {
     );
   });
 
+  protected readonly campusNameById = computed(
+    () => new Map(this.campuses().map((campus) => [campus.id, campus.name])),
+  );
+  protected readonly courseNameById = computed(
+    () => new Map(this.allCourses().map((course) => [course.id, course.name])),
+  );
+  protected readonly classDisplayOptions = computed<MobileFilterClassDisplayOption[]>(() =>
+    this.availableClasses().map((classOption) => ({
+      ...classOption,
+      courseName: this.courseNameById().get(classOption.courseId) ?? null,
+      campusName: this.campusNameById().get(classOption.campusId) ?? null,
+    })),
+  );
+
   protected readonly hasActiveFilters = computed(
     () =>
       this.selectedCourseIds().length > 0 ||
       this.selectedTeacherIds().length > 0 ||
-      !!this.selectedClassId() ||
+      this.selectedClassIds().length > 0 ||
       !this.isDefaultStatuses(),
   );
 
@@ -143,7 +165,7 @@ export class MobileFilterDialogComponent implements OnInit {
     this.selectedCampusIds.set([...data.selectedCampusIds]);
     this.selectedCourseIds.set([...data.selectedCourseIds]);
     this.selectedTeacherIds.set([...data.selectedTeacherIds]);
-    this.selectedClassId.set(data.selectedClassId);
+    this.selectedClassIds.set([...data.selectedClassIds]);
     this.selectedStatuses.set([...data.selectedStatuses]);
   }
 
@@ -151,29 +173,27 @@ export class MobileFilterDialogComponent implements OnInit {
     this.selectedCampusIds.set(ids);
     this.selectedCourseIds.set([]);
     this.selectedTeacherIds.set([]);
-    this.selectedClassId.set(null);
+    this.selectedClassIds.set([]);
   }
 
   protected onCourseIdsChange(ids: string[]): void {
     this.selectedCourseIds.set(ids);
     this.selectedTeacherIds.set([]);
-    this.selectedClassId.set(null);
+    this.selectedClassIds.set([]);
   }
 
   protected onTeacherIdsChange(ids: readonly (string | Staff)[]): void {
     this.selectedTeacherIds.set(this.normalizeIdList(ids));
   }
 
-  protected onClassChange(
-    classValue: string | { readonly id: string; readonly name: string } | null,
-  ): void {
-    this.selectedClassId.set(this.toId(classValue));
+  protected onClassIdsChange(values: readonly (string | { readonly id: string })[]): void {
+    this.selectedClassIds.set(this.normalizeIdList(values));
   }
 
   protected clearFilters(): void {
     this.selectedCourseIds.set([]);
     this.selectedTeacherIds.set([]);
-    this.selectedClassId.set(null);
+    this.selectedClassIds.set([]);
     this.selectedStatuses.set([...DEFAULT_STATUSES]);
   }
 
@@ -182,10 +202,28 @@ export class MobileFilterDialogComponent implements OnInit {
       campusIds: this.selectedCampusIds(),
       courseIds: this.selectedCourseIds(),
       teacherIds: this.selectedTeacherIds(),
-      classId: this.selectedClassId(),
+      classIds: this.selectedClassIds(),
       statuses: this.selectedStatuses(),
     };
     this.ref.close(result);
+  }
+
+  protected getCourseCampusName(course: Course): string | null {
+    return course.campusName ?? this.campusNameById().get(course.campusId) ?? null;
+  }
+
+  protected getTeacherSubjectLabel(teacher: { readonly subjectNames?: string[] }): string | null {
+    if (!teacher.subjectNames || teacher.subjectNames.length === 0) {
+      return null;
+    }
+    return teacher.subjectNames.join('、');
+  }
+
+  protected getClassMetaLabel(classOption: MobileFilterClassDisplayOption): string | null {
+    const parts = [classOption.courseName, classOption.campusName].filter(
+      (value): value is string => !!value,
+    );
+    return parts.length > 0 ? parts.join(' · ') : null;
   }
 
   private isDefaultStatuses(): boolean {

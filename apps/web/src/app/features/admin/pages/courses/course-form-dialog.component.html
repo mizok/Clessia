@@ -100,12 +100,13 @@
 
   <!-- Grade Levels -->
   <div class="form-dialog__field">
-    <label class="form-dialog__label">學段</label>
+    <label class="form-dialog__label">學段<span class="form-dialog__required">*</span></label>
     <p-multiselect
       [options]="gradeOptions"
       [ngModel]="formData().gradeLevels"
       (ngModelChange)="updateForm('gradeLevels', $event)"
-      placeholder="選擇學段（可多選）"
+      placeholder="選擇學段（至少一項）"
+      selectedItemsLabel="{0} 個學段"
       [disabled]="loading()"
       [appendTo]="'body'"
       class="w-full"
@@ -141,7 +142,7 @@
       [icon]="loading() ? 'pi pi-spinner pi-spin' : 'pi pi-check'"
       [loading]="loading()"
       (onClick)="save()"
-      [disabled]="!formData().name.trim() || !formData().campusId || !formData().subjectId"
+      [disabled]="!formData().name.trim() || !formData().campusId || !formData().subjectId || formData().gradeLevels.length === 0"
     />
   </div>
 </div>

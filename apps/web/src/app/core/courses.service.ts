@@ -42,7 +42,7 @@ export interface CreateCourseInput {
   name: string;
   subjectId: string;
   description?: string | null;
-  gradeLevels?: string[];
+  gradeLevels: string[];
 }
 
 export interface UpdateCourseInput {

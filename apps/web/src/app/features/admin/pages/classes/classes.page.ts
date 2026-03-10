@@ -505,7 +505,7 @@ export class ClassesPage implements OnInit {
     if (ids.length === 0) return;
 
     this.confirmationService.confirm({
-      message: `確定要停用這 ${ids.length} 個班級嗎？停用後無法新增報名與產生課堂。`,
+      message: `確定要停用這 ${ids.length} 個班級嗎？僅會停用班級本身，已排課堂維持原樣；停用後無法新增報名與產生課堂。`,
       header: '批次停用',
       icon: 'pi pi-ban',
       acceptLabel: '停用',
@@ -521,7 +521,7 @@ export class ClassesPage implements OnInit {
             this.messageService.add({
               severity: 'success',
               summary: '批次停用完成',
-              detail: `已停用 ${res.updated} 個班級`,
+              detail: `已停用 ${res.updated} 個班級，既有課堂維持原樣`,
             });
           },
           error: (err) => {
@@ -762,12 +762,50 @@ export class ClassesPage implements OnInit {
       });
   }
 
+  protected navigateToUnassignedSessions(cls: Class): void {
+    this.sessionsService
+      .list({
+        classId: cls.id,
+        campusIds: [cls.campusId],
+        courseIds: [cls.courseId],
+      })
+      .subscribe({
+        next: (res) => {
+          const unassignedSessions = res.data.filter(
+            (session) =>
+              session.assignmentStatus === 'unassigned' && session.status === 'scheduled',
+          );
+          const firstSessionDate = unassignedSessions[0]?.sessionDate;
+          const lastSessionDate =
+            unassignedSessions[unassignedSessions.length - 1]?.sessionDate;
+
+          this.openUnassignedSessionsList(cls, firstSessionDate, lastSessionDate);
+        },
+        error: () => {
+          this.openUnassignedSessionsList(cls);
+        },
+      });
+  }
+
   private openSessionsList(cls: Class, from?: string, to?: string): void {
     this.router.navigate(['/admin/sessions'], {
       queryParams: {
         classId: cls.id,
         campusId: cls.campusId,
         courseId: cls.courseId,
+        ...(from ? { from } : {}),
+        ...(to ? { to } : {}),
+      },
+    });
+  }
+
+  private openUnassignedSessionsList(cls: Class, from?: string, to?: string): void {
+    this.router.navigate(['/admin/sessions'], {
+      queryParams: {
+        classId: cls.id,
+        campusId: cls.campusId,
+        courseId: cls.courseId,
+        assignmentStatus: 'unassigned',
         ...(from ? { from } : {}),
         ...(to ? { to } : {}),
       },

@@ -28,11 +28,20 @@
         selectedItemsLabel="{0} 個課程"
         [appendTo]="'body'"
         [filter]="true"
-        filterBy="name"
+        filterBy="name,campusName"
         [ngModel]="selectedCourseIds()"
         (ngModelChange)="onCourseIdsChange($event)"
         styleClass="w-full"
-      />
+      >
+        <ng-template #item let-course>
+          <div class="mobile-filter-dialog__course-option">
+            <span class="mobile-filter-dialog__course-option-name">{{ course.name }}</span>
+            @if (getCourseCampusName(course); as campusName) {
+              <span class="mobile-filter-dialog__course-option-campus">{{ campusName }}</span>
+            }
+          </div>
+        </ng-template>
+      </p-multiselect>
     </div>
   }
   <div class="mobile-filter-dialog__row">
@@ -48,27 +57,47 @@
       selectedItemsLabel="{0} 位老師"
       [appendTo]="'body'"
       [filter]="true"
+      filterBy="displayName,subjectNames"
       filterPlaceholder="搜尋老師..."
       [ngModel]="selectedTeacherIds()"
       (ngModelChange)="onTeacherIdsChange($event)"
       styleClass="w-full"
-    />
+    >
+      <ng-template #item let-teacher>
+        <div class="mobile-filter-dialog__teacher-option">
+          <span class="mobile-filter-dialog__teacher-option-name">{{ teacher.displayName }}</span>
+          @if (getTeacherSubjectLabel(teacher); as subjectLabel) {
+            <span class="mobile-filter-dialog__teacher-option-subjects">{{ subjectLabel }}</span>
+          }
+        </div>
+      </ng-template>
+    </p-multiselect>
   </div>
   @if (availableClasses().length > 0) {
     <div class="mobile-filter-dialog__row">
       <label class="mobile-filter-dialog__label">班級</label>
-      <p-select
-        [options]="availableClasses()"
+      <p-multiselect
+        [options]="classDisplayOptions()"
         optionLabel="name"
         optionValue="id"
         placeholder="所有班級"
+        selectedItemsLabel="{0} 個班級"
         [appendTo]="'body'"
         [filter]="true"
-        [showClear]="true"
-        [ngModel]="selectedClassId()"
-        (ngModelChange)="onClassChange($event)"
+        filterBy="name,courseName,campusName"
+        [ngModel]="selectedClassIds()"
+        (ngModelChange)="onClassIdsChange($event)"
         styleClass="w-full"
-      />
+      >
+        <ng-template #item let-classOption>
+          <div class="mobile-filter-dialog__class-option">
+            <span class="mobile-filter-dialog__class-option-name">{{ classOption.name }}</span>
+            @if (getClassMetaLabel(classOption); as metaLabel) {
+              <span class="mobile-filter-dialog__class-option-meta">{{ metaLabel }}</span>
+            }
+          </div>
+        </ng-template>
+      </p-multiselect>
     </div>
   }
   <div class="mobile-filter-dialog__row">

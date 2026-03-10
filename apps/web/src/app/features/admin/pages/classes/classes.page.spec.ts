@@ -11,7 +11,7 @@ import { ClassesService, type Class } from '@core/classes.service';
 import { CampusesService } from '@core/campuses.service';
 import { SubjectsService } from '@core/subjects.service';
 import { StaffService } from '@core/staff.service';
-import { SessionsService } from '@core/sessions.service';
+import { SessionsService, type Session } from '@core/sessions.service';
 import { OverlayContainerService } from '@core/overlay-container.service';
 import { BrowserStateService } from '@core/browser-state.service';
 
@@ -29,6 +29,7 @@ describe('ClassesPage', () => {
   };
   const classesServiceMock = {
     list: vi.fn(() => of({ data: [] })),
+    batchSetActive: vi.fn(() => of({ updated: 0 })),
   };
   const campusesServiceMock = {
     list: vi.fn(() => of({ data: [] })),
@@ -184,6 +185,96 @@ describe('ClassesPage', () => {
     });
   });
 
+  it('navigates to unassigned sessions with first and last unassigned session dates for the class', () => {
+    const unassignedSessions: Session[] = [
+      {
+        id: 'session-1',
+        classId: 'class-1',
+        className: '數學 A 班',
+        courseId: 'course-1',
+        courseName: '數學',
+        campusId: 'campus-1',
+        campusName: '本校',
+        sessionDate: '2026-03-15',
+        startTime: '09:00',
+        endTime: '11:00',
+        teacherId: null,
+        teacherName: null,
+        status: 'scheduled',
+        assignmentStatus: 'unassigned',
+        hasChanges: false,
+      },
+      {
+        id: 'session-2',
+        classId: 'class-1',
+        className: '數學 A 班',
+        courseId: 'course-1',
+        courseName: '數學',
+        campusId: 'campus-1',
+        campusName: '本校',
+        sessionDate: '2026-04-20',
+        startTime: '09:00',
+        endTime: '11:00',
+        teacherId: null,
+        teacherName: null,
+        status: 'scheduled',
+        assignmentStatus: 'unassigned',
+        hasChanges: false,
+      },
+      {
+        id: 'session-3',
+        classId: 'class-1',
+        className: '數學 A 班',
+        courseId: 'course-1',
+        courseName: '數學',
+        campusId: 'campus-1',
+        campusName: '本校',
+        sessionDate: '2026-04-25',
+        startTime: '09:00',
+        endTime: '11:00',
+        teacherId: 'teacher-1',
+        teacherName: '王老師',
+        status: 'scheduled',
+        assignmentStatus: 'assigned',
+        hasChanges: false,
+      },
+    ];
+    (sessionsServiceMock.list as any).mockReturnValueOnce(
+      of({
+        data: unassignedSessions,
+      }),
+    );
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const cls = {
+      id: 'class-1',
+      campusId: 'campus-1',
+      courseId: 'course-1',
+      name: '數學 A 班',
+      maxStudents: 20,
+      gradeLevels: [],
+      nextClassId: null,
+      isActive: true,
+      orgId: 'org-1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } as Class;
+
+    (
+      component as unknown as { navigateToUnassignedSessions: (target: Class) => void }
+    ).navigateToUnassignedSessions(cls);
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/admin/sessions'], {
+      queryParams: {
+        classId: 'class-1',
+        campusId: 'campus-1',
+        courseId: 'course-1',
+        assignmentStatus: 'unassigned',
+        from: '2026-03-15',
+        to: '2026-04-20',
+      },
+    });
+  });
+
   it('uses hasPastSessions instead of scheduleCount for delete warning copy', () => {
     const confirmationService = fixture.debugElement.injector.get(ConfirmationService);
     const confirmSpy = vi.spyOn(confirmationService, 'confirm');
@@ -210,6 +301,47 @@ describe('ClassesPage', () => {
     expect(confirmSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         message: '確定要刪除班級「英文 B 班」嗎？此操作無法復原。',
+      }),
+    );
+  });
+
+  it('explains that batch deactivate keeps existing scheduled sessions', () => {
+    const confirmationService = fixture.debugElement.injector.get(ConfirmationService);
+    const confirmSpy = vi.spyOn(confirmationService, 'confirm');
+
+    (
+      component as unknown as {
+        classes: { set: (value: Class[]) => void };
+        selectedClassIds: { set: (value: Set<string>) => void };
+        batchDeactivate: () => void;
+      }
+    ).classes.set([
+      {
+        id: 'class-1',
+        campusId: 'campus-1',
+        courseId: 'course-1',
+        name: '數學 A 班',
+        maxStudents: 20,
+        gradeLevels: [],
+        nextClassId: null,
+        isActive: true,
+        orgId: 'org-1',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      } as Class,
+    ]);
+    (
+      component as unknown as {
+        selectedClassIds: { set: (value: Set<string>) => void };
+      }
+    ).selectedClassIds.set(new Set(['class-1']));
+
+    (component as unknown as { batchDeactivate: () => void }).batchDeactivate();
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message:
+          '確定要停用這 1 個班級嗎？僅會停用班級本身，已排課堂維持原樣；停用後無法新增報名與產生課堂。',
       }),
     );
   });

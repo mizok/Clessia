@@ -7,6 +7,7 @@ import {
   SessionCompletedError,
   SessionUnassignedError,
 } from '../domain/session-assignment/session-operation-guard';
+import { planBatchUpdateTime } from '../domain/session-assignment/batch-update-time-planner';
 
 // ============================================================
 // Schemas
@@ -1562,67 +1563,33 @@ app.openapi(batchUpdateTimeRoute, async (c) => {
     teacher_id: string | null;
   }>;
 
-  const conflicts: BatchSessionConflictItem[] = [];
-  const processableIds: string[] = [];
-
-  for (const target of targetSessions) {
-    if (target.status !== 'scheduled') {
-      conflicts.push({
-        sessionId: target.id,
-        sessionDate: target.session_date,
-        reason: 'status_not_editable',
-        detail: '僅可修改狀態為「scheduled」的課堂',
-      });
-      continue;
-    }
-
-    const classConflict = classPeers.find(
-      (peer) =>
-        peer.id !== target.id &&
-        peer.class_id === target.class_id &&
-        peer.session_date === target.session_date &&
-        isTimeOverlap(newStartTime, newEndTime, normalizeTime(peer.start_time), normalizeTime(peer.end_time)),
-    );
-
-    if (classConflict) {
-      conflicts.push({
-        sessionId: target.id,
-        sessionDate: target.session_date,
-        reason: 'class_conflict',
-        detail: '同班級於此時段已有課堂',
-        conflictingSessionId: classConflict.id,
-      });
-      continue;
-    }
-
-    if (target.teacher_id) {
-      const teacherConflict = teacherPeers.find(
-        (peer) =>
-          peer.id !== target.id &&
-          peer.teacher_id === target.teacher_id &&
-          peer.session_date === target.session_date &&
-          isTimeOverlap(
-            newStartTime,
-            newEndTime,
-            normalizeTime(peer.start_time),
-            normalizeTime(peer.end_time),
-          ),
-      );
-
-      if (teacherConflict) {
-        conflicts.push({
-          sessionId: target.id,
-          sessionDate: target.session_date,
-          reason: 'teacher_conflict',
-          detail: '老師於此時段已有其他課堂',
-          conflictingSessionId: teacherConflict.id,
-        });
-        continue;
-      }
-    }
-
-    processableIds.push(target.id);
-  }
+  const batchPlan = planBatchUpdateTime({
+    newStartTime,
+    newEndTime,
+    targetSessions: targetSessions.map((target) => ({
+      id: target.id,
+      classId: target.class_id,
+      teacherId: target.teacher_id,
+      sessionDate: target.session_date,
+      status: target.status,
+    })),
+    existingClassPeers: classPeers.map((peer) => ({
+      id: peer.id,
+      classId: peer.class_id,
+      sessionDate: peer.session_date,
+      startTime: peer.start_time,
+      endTime: peer.end_time,
+    })),
+    existingTeacherPeers: teacherPeers.map((peer) => ({
+      id: peer.id,
+      teacherId: peer.teacher_id,
+      sessionDate: peer.session_date,
+      startTime: peer.start_time,
+      endTime: peer.end_time,
+    })),
+  });
+  const conflicts: BatchSessionConflictItem[] = batchPlan.conflicts;
+  const processableIds = batchPlan.processableIds;
 
   const missingCount = uniqueSessionIds.length - targetSessions.length;
   const updated = processableIds.length;

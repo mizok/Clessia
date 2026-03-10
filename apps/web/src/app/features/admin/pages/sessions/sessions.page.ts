@@ -8,7 +8,7 @@ import {
   viewChild,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { endOfMonth, format } from 'date-fns';
 import { MessageService, type MenuItem } from 'primeng/api';
 import { MenuModule, type Menu } from 'primeng/menu';
@@ -79,6 +79,7 @@ export class SessionsPage implements OnInit {
   private readonly overlayContainerService = inject(OverlayContainerService);
   private readonly dialogService = inject(DialogService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   protected get overlayContainer(): HTMLElement | null {
     return this.overlayContainerService.getContainer();
@@ -102,7 +103,7 @@ export class SessionsPage implements OnInit {
   protected readonly selectedCampusIds = signal<string[]>([]);
   protected readonly selectedCourseIds = signal<string[]>([]);
   protected readonly selectedTeacherIds = signal<string[]>([]);
-  protected readonly selectedClassId = signal<string | null>(null);
+  protected readonly selectedClassIds = signal<string[]>([]);
   protected readonly selectedStatuses = signal<string[]>([...DEFAULT_STATUSES]);
 
   // ── List date range ────────────────────────────────────────────────────
@@ -164,7 +165,7 @@ export class SessionsPage implements OnInit {
     let count = 0;
     if (this.selectedCourseIds().length > 0) count++;
     if (this.selectedTeacherIds().length > 0) count++;
-    if (this.selectedClassId()) count++;
+    if (this.selectedClassIds().length > 0) count++;
     if (this.listDateRangeModified()) count++;
     if (!this.isDefaultStatuses()) count++;
     return count;
@@ -174,7 +175,7 @@ export class SessionsPage implements OnInit {
     () =>
       this.selectedCourseIds().length > 0 ||
       this.selectedTeacherIds().length > 0 ||
-      !!this.selectedClassId() ||
+      this.selectedClassIds().length > 0 ||
       this.listDateRangeModified() ||
       !this.isDefaultStatuses(),
   );
@@ -193,6 +194,8 @@ export class SessionsPage implements OnInit {
 
     return sessions.filter((s) => {
       if (!statuses.has(s.status)) return false;
+      const classIds = this.selectedClassIds();
+      if (classIds.length > 0 && !classIds.includes(s.classId)) return false;
 
       if (hasUnassigned || realTeacherIds.size > 0) {
         const matchesUnassigned =
@@ -320,7 +323,7 @@ export class SessionsPage implements OnInit {
       selectedCampusIds: this.selectedCampusIds(),
       selectedCourseIds: this.selectedCourseIds(),
       selectedTeacherIds: this.selectedTeacherIds(),
-      selectedClassId: this.selectedClassId(),
+      selectedClassIds: this.selectedClassIds(),
       selectedStatuses: this.selectedStatuses(),
     };
     const ref = this.dialogService.open(MobileFilterDialogComponent, {
@@ -337,8 +340,9 @@ export class SessionsPage implements OnInit {
         this.selectedCampusIds.set(result.campusIds);
         this.selectedCourseIds.set(result.courseIds);
         this.selectedTeacherIds.set(result.teacherIds);
-        this.selectedClassId.set(result.classId);
+        this.selectedClassIds.set(result.classIds);
         this.selectedStatuses.set(result.statuses);
+        this.syncQueryParams();
         this.loadSessions();
       }
     });
@@ -399,44 +403,53 @@ export class SessionsPage implements OnInit {
     this.selectedCampusIds.set(ids);
     this.selectedCourseIds.set([]);
     this.selectedTeacherIds.set([]);
-    this.selectedClassId.set(null);
+    this.selectedClassIds.set([]);
+    this.syncQueryParams();
     this.loadSessions();
   }
 
   protected onCourseIdsChange(ids: string[]): void {
     this.selectedCourseIds.set(ids);
     this.selectedTeacherIds.set([]);
-    this.selectedClassId.set(null);
+    this.selectedClassIds.set([]);
+    this.syncQueryParams();
     this.loadSessions();
   }
 
   protected onTeacherIdsChange(ids: string[]): void {
     this.selectedTeacherIds.set(ids);
+    this.syncQueryParams();
     this.loadSessions();
   }
 
-  protected onClassChange(classId: string | null): void {
-    this.selectedClassId.set(classId);
+  protected onClassChange(classIds: string[]): void {
+    this.selectedClassIds.set(classIds);
+    this.syncQueryParams();
     this.loadSessions();
   }
 
   protected onListDateRangeChange(range: Date[]): void {
     this.listDateRange.set(range);
     this.listDateRangeModified.set(true);
-    if (range.length === 2) this.loadSessions();
+    if (range.length === 2) {
+      this.syncQueryParams();
+      this.loadSessions();
+    }
   }
 
   protected onStatusesChange(statuses: string[] | null): void {
     this.selectedStatuses.set(statuses ?? []);
+    this.syncQueryParams();
   }
 
   protected clearFilters(): void {
     this.selectedCourseIds.set([]);
     this.selectedTeacherIds.set([]);
-    this.selectedClassId.set(null);
+    this.selectedClassIds.set([]);
     this.listDateRange.set(this.getDefaultListDateRange());
     this.listDateRangeModified.set(false);
     this.selectedStatuses.set([...DEFAULT_STATUSES]);
+    this.syncQueryParams();
     this.loadSessions();
   }
 
@@ -465,17 +478,80 @@ export class SessionsPage implements OnInit {
 
   private applyQueryParams(): void {
     const params = this.route.snapshot.queryParams;
-    if (params['campusId']) this.selectedCampusIds.set([params['campusId']]);
-    if (params['courseId']) this.selectedCourseIds.set([params['courseId']]);
-    if (params['classId']) this.selectedClassId.set(params['classId']);
+    const campusIds = this.parseMultiValue(params['campusIds'] ?? params['campusId']);
+    if (campusIds.length > 0) this.selectedCampusIds.set(campusIds);
+    const courseIds = this.parseMultiValue(params['courseIds'] ?? params['courseId']);
+    if (courseIds.length > 0) this.selectedCourseIds.set(courseIds);
+    const classIds = this.parseMultiValue(params['classIds'] ?? params['classId']);
+    if (classIds.length > 0) this.selectedClassIds.set(classIds);
     if (params['from']) {
       const fromDate = new Date(params['from']);
       this.listDateRange.set([fromDate, params['to'] ? new Date(params['to']) : endOfMonth(fromDate)]);
       this.listDateRangeModified.set(true);
     }
+    const teacherIds = this.parseMultiValue(params['teacherIds']);
     if (params['assignmentStatus'] === 'unassigned') {
-      this.selectedTeacherIds.set(['__unassigned__']);
+      teacherIds.push('__unassigned__');
     }
+    if (teacherIds.length > 0) {
+      this.selectedTeacherIds.set(Array.from(new Set(teacherIds)));
+    }
+    if (params['statuses'] === 'all') {
+      this.selectedStatuses.set([]);
+    } else {
+      const statuses = this.parseMultiValue(params['statuses']);
+      if (statuses.length > 0) {
+        this.selectedStatuses.set(statuses);
+      }
+    }
+  }
+
+  private syncQueryParams(): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: this.buildQueryParams(),
+      replaceUrl: true,
+    });
+  }
+
+  private buildQueryParams(): Record<string, string | null> {
+    const query: Record<string, string | null> = {};
+    const campusIds = this.selectedCampusIds();
+    const courseIds = this.selectedCourseIds();
+    const teacherIds = this.selectedTeacherIds();
+    const classIds = this.selectedClassIds();
+    const range = this.listDateRange();
+
+    query['campusIds'] = campusIds.length > 0 ? campusIds.join(',') : null;
+    query['courseIds'] = courseIds.length > 0 ? courseIds.join(',') : null;
+
+    const realTeacherIds = teacherIds.filter((id) => id !== '__unassigned__');
+    query['teacherIds'] = realTeacherIds.length > 0 ? realTeacherIds.join(',') : null;
+    query['assignmentStatus'] = teacherIds.includes('__unassigned__') ? 'unassigned' : null;
+    query['classIds'] = classIds.length > 0 ? classIds.join(',') : null;
+    query['classId'] = null;
+
+    query['from'] = range.length > 0 ? format(range[0], 'yyyy-MM-dd') : null;
+    query['to'] = range.length > 1 ? format(range[1], 'yyyy-MM-dd') : query['from'];
+
+    const statuses = this.selectedStatuses();
+    if (statuses.length === 0) {
+      query['statuses'] = 'all';
+    } else if (this.isDefaultStatuses()) {
+      query['statuses'] = null;
+    } else {
+      query['statuses'] = statuses.join(',');
+    }
+
+    return query;
+  }
+
+  private parseMultiValue(value: string | undefined): string[] {
+    if (!value) return [];
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
   }
 
   private getDefaultListDateRange(): Date[] {
@@ -496,6 +572,7 @@ export class SessionsPage implements OnInit {
         this.campuses.set(res.data);
         if (res.data.length > 0 && this.selectedCampusIds().length === 0) {
           this.selectedCampusIds.set([res.data[0].id]);
+          this.syncQueryParams();
           this.loadSessions();
         }
       },
@@ -534,7 +611,7 @@ export class SessionsPage implements OnInit {
         campusIds: this.selectedCampusIds().length > 0 ? this.selectedCampusIds() : undefined,
         courseIds: this.selectedCourseIds().length > 0 ? this.selectedCourseIds() : undefined,
         teacherIds,
-        classId: this.selectedClassId() ?? undefined,
+        classId: this.selectedClassIds().length === 1 ? this.selectedClassIds()[0] : undefined,
       })
       .subscribe({
         next: (res) => {

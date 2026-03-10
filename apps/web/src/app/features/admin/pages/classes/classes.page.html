@@ -279,21 +279,16 @@
                             [severity]="cls.isActive ? 'success' : 'secondary'"
                           />
                           @if (cls.upcomingUnassignedCount && cls.upcomingUnassignedCount > 0) {
-                            <a
+                            <button
+                              type="button"
                               class="class-row__intervention-link"
-                              [routerLink]="['/admin/sessions']"
-                              [queryParams]="{
-                                classId: cls.id,
-                                campusId: cls.campusId,
-                                courseId: cls.courseId,
-                                assignmentStatus: 'unassigned',
-                              }"
+                              (click)="navigateToUnassignedSessions(cls); $event.stopPropagation()"
                               pTooltip="查看未指派課堂"
                               tooltipPosition="top"
                             >
                               <i class="pi pi-exclamation-triangle"></i>
                               {{ cls.upcomingUnassignedCount }} 堂未指派
-                            </a>
+                            </button>
                           }
                           @if (cls.scheduleCount === 0) {
                             <span

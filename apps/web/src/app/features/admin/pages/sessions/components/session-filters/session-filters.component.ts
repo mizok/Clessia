@@ -3,7 +3,6 @@ import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { DatePickerModule } from 'primeng/datepicker';
 import { MultiSelectModule } from 'primeng/multiselect';
-import { SelectModule } from 'primeng/select';
 import type { Campus } from '@core/campuses.service';
 import type { Course } from '@core/courses.service';
 import type { Staff } from '@core/staff.service';
@@ -22,6 +21,7 @@ export const DEFAULT_STATUSES = ['scheduled', 'completed'];
 export interface TeacherSelectOption {
   readonly id: string;
   readonly displayName: string;
+  readonly subjectNames?: string[];
 }
 
 export interface TeacherOptionGroup {
@@ -36,9 +36,14 @@ export interface SessionFilterClassOption {
   readonly campusId: string;
 }
 
+interface SessionFilterClassDisplayOption extends SessionFilterClassOption {
+  readonly courseName: string | null;
+  readonly campusName: string | null;
+}
+
 @Component({
   selector: 'app-session-filters',
-  imports: [FormsModule, ButtonModule, DatePickerModule, MultiSelectModule, SelectModule],
+  imports: [FormsModule, ButtonModule, DatePickerModule, MultiSelectModule],
   templateUrl: './session-filters.component.html',
   styleUrl: './session-filters.component.scss',
 })
@@ -53,7 +58,7 @@ export class SessionFiltersComponent {
   readonly selectedCampusIds = input<string[]>([]);
   readonly selectedCourseIds = input<string[]>([]);
   readonly selectedTeacherIds = input<string[]>([]);
-  readonly selectedClassId = input<string | null>(null);
+  readonly selectedClassIds = input<string[]>([]);
   readonly selectedStatuses = input<string[]>(DEFAULT_STATUSES);
 
   readonly activeFilterCount = input(0);
@@ -64,7 +69,7 @@ export class SessionFiltersComponent {
   readonly campusIdsChange = output<string[]>();
   readonly courseIdsChange = output<string[]>();
   readonly teacherIdsChange = output<string[]>();
-  readonly classChange = output<string | null>();
+  readonly classIdsChange = output<string[]>();
   readonly statusesChange = output<string[]>();
   readonly clearFilters = output<void>();
 
@@ -93,6 +98,20 @@ export class SessionFiltersComponent {
     return teachers.filter((t) => t.subjectIds.some((sid) => subjectIds.has(sid)));
   });
 
+  protected readonly campusNameById = computed(
+    () => new Map(this.campuses().map((campus) => [campus.id, campus.name])),
+  );
+  protected readonly courseNameById = computed(
+    () => new Map(this.availableCourses().map((course) => [course.id, course.name])),
+  );
+  protected readonly classDisplayOptions = computed<SessionFilterClassDisplayOption[]>(() =>
+    this.availableClasses().map((classOption) => ({
+      ...classOption,
+      courseName: this.courseNameById().get(classOption.courseId) ?? null,
+      campusName: this.campusNameById().get(classOption.campusId) ?? null,
+    })),
+  );
+
   protected onListDateRangeChange(range: Date[]): void {
     this.listDateRangeChange.emit(range);
   }
@@ -109,12 +128,30 @@ export class SessionFiltersComponent {
     this.teacherIdsChange.emit(this.normalizeIdList(ids));
   }
 
-  protected onClassSelectChange(value: string | SessionFilterClassOption | null): void {
-    this.classChange.emit(this.toId(value));
+  protected onClassMultiChange(values: readonly (string | SessionFilterClassOption)[]): void {
+    this.classIdsChange.emit(this.normalizeIdList(values));
   }
 
   protected onStatusesChange(values: string[] | null): void {
     this.statusesChange.emit(values ?? []);
+  }
+
+  protected getCourseCampusName(course: Course): string | null {
+    return course.campusName ?? this.campusNameById().get(course.campusId) ?? null;
+  }
+
+  protected getTeacherSubjectLabel(teacher: TeacherSelectOption): string | null {
+    if (!teacher.subjectNames || teacher.subjectNames.length === 0) {
+      return null;
+    }
+    return teacher.subjectNames.join('、');
+  }
+
+  protected getClassMetaLabel(classOption: SessionFilterClassDisplayOption): string | null {
+    const parts = [classOption.courseName, classOption.campusName].filter(
+      (value): value is string => !!value,
+    );
+    return parts.length > 0 ? parts.join(' · ') : null;
   }
 
   private toId(value: unknown): string | null {

@@ -41,7 +41,7 @@ const CreateCourseSchema = z
     name: z.string().min(1).max(50).openapi({ description: '課程名稱', example: '國一數學' }),
     subjectId: z.uuid().openapi({ description: '科目 ID' }),
     description: z.string().max(500).nullable().optional().openapi({ description: '課程說明' }),
-    gradeLevels: z.array(z.string()).optional().openapi({ description: '適合年級' }),
+    gradeLevels: z.array(z.string()).min(1).openapi({ description: '適合年級' }),
   })
   .openapi('CreateCourse');
 
@@ -51,7 +51,7 @@ const UpdateCourseSchema = z
     subjectId: z.uuid().optional(),
     description: z.string().max(500).nullable().optional(),
     isActive: z.boolean().optional(),
-    gradeLevels: z.array(z.string()).optional(),
+    gradeLevels: z.array(z.string()).min(1).optional(),
     deactivateMode: z.enum(['keep_sessions', 'cancel_future_sessions']).optional(),
   })
   .openapi('UpdateCourse');
@@ -286,7 +286,7 @@ app.openapi(createCourseRoute, async (c) => {
       name: body.name,
       subject_id: body.subjectId,
       description: body.description || null,
-      grade_levels: body.gradeLevels || [],
+      grade_levels: body.gradeLevels,
     })
     .select('*, campuses(name), subjects(name)')
     .single();

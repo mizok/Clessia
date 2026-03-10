@@ -34,6 +34,7 @@ DECLARE
     v_campus_name TEXT;
     v_course_name TEXT;
     v_subject_name TEXT;
+    v_grade_levels TEXT[];
     v_teacher_display_name TEXT;
     admin_user_id TEXT;
     admin_user_uuid UUID;
@@ -160,8 +161,21 @@ BEGIN
         FOR course_index IN 1..11 LOOP
             v_subject_name := subject_names[((course_index - 1) % array_length(subject_names, 1)) + 1];
             v_course_name := format('%s %s', v_subject_name, course_themes[course_index]);
+            v_grade_levels := CASE course_index
+                WHEN 1 THEN ARRAY['國一']
+                WHEN 2 THEN ARRAY['國二']
+                WHEN 3 THEN ARRAY['國三']
+                WHEN 4 THEN ARRAY['高一']
+                WHEN 5 THEN ARRAY['高二']
+                WHEN 6 THEN ARRAY['高三']
+                WHEN 7 THEN ARRAY['國二', '國三']
+                WHEN 8 THEN ARRAY['小五', '小六']
+                WHEN 9 THEN ARRAY['國一', '國二']
+                WHEN 10 THEN ARRAY['國二', '國三']
+                ELSE ARRAY['高一', '高二']
+            END;
 
-            INSERT INTO public.courses (org_id, campus_id, name, subject_id, description, is_active)
+            INSERT INTO public.courses (org_id, campus_id, name, subject_id, description, is_active, grade_levels)
             VALUES (
                 demo_org_id,
                 v_campus_id,
@@ -172,11 +186,13 @@ BEGIN
                     LIMIT 1
                 ),
                 format('%s｜%s｜示範課程', v_campus_name, v_course_name),
-                true
+                true,
+                v_grade_levels
             )
             ON CONFLICT (campus_id, name) DO UPDATE SET
                 subject_id = EXCLUDED.subject_id,
                 description = EXCLUDED.description,
+                grade_levels = EXCLUDED.grade_levels,
                 is_active = EXCLUDED.is_active,
                 updated_at = NOW();
         END LOOP;

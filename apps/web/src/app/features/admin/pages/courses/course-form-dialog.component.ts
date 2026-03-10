@@ -111,6 +111,10 @@ export class CourseFormDialogComponent {
       this.messageService.add({ severity: 'warn', summary: '請選擇科目' });
       return;
     }
+    if (form.gradeLevels.length === 0) {
+      this.messageService.add({ severity: 'warn', summary: '請至少選擇一個學段' });
+      return;
+    }
 
     this.loading.set(true);
 

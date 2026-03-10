@@ -61,10 +61,19 @@
         selectedItemsLabel="{0} 個課程"
         [appendTo]="'body'"
         [filter]="true"
-        filterBy="name"
+        filterBy="name,campusName"
         [ngModel]="selectedCourseIds()"
         (ngModelChange)="onCourseMultiChange($event)"
-      />
+      >
+        <ng-template #item let-course>
+          <div class="session-filters__course-option">
+            <span class="session-filters__course-option-name">{{ course.name }}</span>
+            @if (getCourseCampusName(course); as campusName) {
+              <span class="session-filters__course-option-campus">{{ campusName }}</span>
+            }
+          </div>
+        </ng-template>
+      </p-multiselect>
     }
     @if (selectedCampusIds().length > 0) {
       <p-multiselect
@@ -79,24 +88,44 @@
         selectedItemsLabel="{0} 位老師"
         [appendTo]="'body'"
         [filter]="true"
+        filterBy="displayName,subjectNames"
         filterPlaceholder="搜尋老師..."
         [ngModel]="selectedTeacherIds()"
         (ngModelChange)="onTeacherMultiChange($event)"
-      />
+      >
+        <ng-template #item let-teacher>
+          <div class="session-filters__teacher-option">
+            <span class="session-filters__teacher-option-name">{{ teacher.displayName }}</span>
+            @if (getTeacherSubjectLabel(teacher); as subjectLabel) {
+              <span class="session-filters__teacher-option-subjects">{{ subjectLabel }}</span>
+            }
+          </div>
+        </ng-template>
+      </p-multiselect>
     }
     @if (selectedCampusIds().length > 0 && selectedCourseIds().length > 0 && availableClasses().length > 0) {
-      <p-select
+      <p-multiselect
         class="session-filters__control"
-        [options]="availableClasses()"
+        [options]="classDisplayOptions()"
         optionLabel="name"
         optionValue="id"
         placeholder="所有班級"
+        selectedItemsLabel="{0} 個班級"
         [appendTo]="'body'"
         [filter]="true"
-        [showClear]="true"
-        [ngModel]="selectedClassId()"
-        (ngModelChange)="onClassSelectChange($event)"
-      />
+        filterBy="name,courseName,campusName"
+        [ngModel]="selectedClassIds()"
+        (ngModelChange)="onClassMultiChange($event)"
+      >
+        <ng-template #item let-classOption>
+          <div class="session-filters__class-option">
+            <span class="session-filters__class-option-name">{{ classOption.name }}</span>
+            @if (getClassMetaLabel(classOption); as metaLabel) {
+              <span class="session-filters__class-option-meta">{{ metaLabel }}</span>
+            }
+          </div>
+        </ng-template>
+      </p-multiselect>
     }
     <p-multiselect
       class="session-filters__control session-filters__control--status"

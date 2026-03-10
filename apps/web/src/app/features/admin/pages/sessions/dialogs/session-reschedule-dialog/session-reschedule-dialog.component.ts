@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
@@ -30,11 +30,23 @@ export class SessionRescheduleDialogComponent implements OnInit {
   readonly targetDateSessions = signal<Array<{
     courseName: string;
     className: string;
+    campusName: string;
     startTime: string;
     endTime: string;
+    teacherId: string | null;
     teacherName: string | null;
   }>>([]);
   readonly loadingTargetDate = signal(false);
+  readonly targetCampusSessions = computed(() => {
+    const session = this.session();
+    if (!session) return [];
+    return this.targetDateSessions().filter((item) => item.campusName === session.campusName);
+  });
+  readonly targetTeacherSessions = computed(() => {
+    const session = this.session();
+    if (!session?.teacherId) return [];
+    return this.targetDateSessions().filter((item) => item.teacherId === session.teacherId);
+  });
 
   readonly form = this.fb.group({
     newSessionDate: [<Date | null>null, Validators.required],
@@ -61,7 +73,7 @@ export class SessionRescheduleDialogComponent implements OnInit {
     if (!s) return;
     const dateStr = format(date, 'yyyy-MM-dd');
     this.loadingTargetDate.set(true);
-    this.sessionsService.list({ from: dateStr, to: dateStr, campusIds: [s.campusId] })
+    this.sessionsService.list({ from: dateStr, to: dateStr })
       .subscribe({
         next: res => {
           this.targetDateSessions.set(
@@ -70,8 +82,10 @@ export class SessionRescheduleDialogComponent implements OnInit {
               .map(session => ({
                 courseName: session.courseName,
                 className: session.className,
+                campusName: session.campusName,
                 startTime: session.startTime,
                 endTime: session.endTime,
+                teacherId: session.teacherId,
                 teacherName: session.teacherName,
               }))
           );

@@ -72,6 +72,44 @@ describe('SessionFiltersComponent', () => {
 
     expect(emitted).toEqual(['teacher-1', 'teacher-2']);
   });
+
+  it('should join teacher subject names for display', () => {
+    const subjectLabel = (
+      component as unknown as {
+        getTeacherSubjectLabel: (teacher: { readonly subjectNames?: string[] }) => string | null;
+      }
+    ).getTeacherSubjectLabel(buildTeacher({ subjectNames: ['國文', '英文'] }));
+
+    expect(subjectLabel).toBe('國文、英文');
+  });
+
+  it('should join class course and campus label for display', () => {
+    const metaLabel = (
+      component as unknown as {
+        getClassMetaLabel: (classOption: { readonly courseName: string | null; readonly campusName: string | null }) => string | null;
+      }
+    ).getClassMetaLabel({
+      courseName: '國文 七年級基礎先修班',
+      campusName: '示範分校01',
+    });
+
+    expect(metaLabel).toBe('國文 七年級基礎先修班 · 示範分校01');
+  });
+
+  it('should emit normalized class ids from multi-select values', () => {
+    let emitted: string[] = [];
+    component.classIdsChange.subscribe((value: string[]) => {
+      emitted = value;
+    });
+
+    (
+      component as unknown as {
+        onClassMultiChange: (values: readonly (string | { readonly id: string })[]) => void;
+      }
+    ).onClassMultiChange(['class-1', { id: 'class-2' }, { id: 'class-1' }]);
+
+    expect(emitted).toEqual(['class-1', 'class-2']);
+  });
 });
 
 function buildCourse(overrides: Partial<Course>): Course {
