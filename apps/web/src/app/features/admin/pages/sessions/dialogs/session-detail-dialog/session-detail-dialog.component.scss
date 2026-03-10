@@ -189,6 +189,16 @@
     font-weight: var(--font-semibold);
   }
 
+  &__empty-description {
+    max-width: 30ch;
+    color: var(--zinc-500);
+    line-height: var(--leading-relaxed);
+  }
+
+  &__empty--error &__empty-icon {
+    color: var(--error-600);
+  }
+
   &__actions {
     display: flex;
     flex-wrap: wrap;
