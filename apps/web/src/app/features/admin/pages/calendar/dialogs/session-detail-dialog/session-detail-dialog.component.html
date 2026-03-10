@@ -51,7 +51,7 @@
             @if (c.reason) {
               <span class="cal-detail__reason">原因：{{ c.reason }}</span>
             }
-            <span class="cal-detail__by">{{ c.createdByName }}</span>
+            <span class="cal-detail__by">{{ c.createdByName }}・{{ c.createdAt | date:'MM/dd HH:mm' }}</span>
           </div>
         </div>
       }
@@ -59,13 +59,16 @@
   }
 
   <div class="cal-detail__actions">
-    @if (canOperate()) {
+    @if (session()?.status !== 'cancelled') {
       <p-button
         label="停課"
         severity="danger"
         [outlined]="true"
         size="small"
         icon="pi pi-ban"
+        [disabled]="!canOperate()"
+        [pTooltip]="canOperate() ? '' : '課堂已結束，無法操作'"
+        tooltipPosition="top"
         (onClick)="openCancel()"
       />
       <p-button
@@ -74,6 +77,9 @@
         [outlined]="true"
         size="small"
         icon="pi pi-users"
+        [disabled]="!canOperate()"
+        [pTooltip]="canOperate() ? '' : '課堂已結束，無法操作'"
+        tooltipPosition="top"
         (onClick)="openSubstitute()"
       />
       <p-button
@@ -82,6 +88,9 @@
         [outlined]="true"
         size="small"
         icon="pi pi-calendar-plus"
+        [disabled]="!canOperate()"
+        [pTooltip]="canOperate() ? '' : '課堂已結束，無法操作'"
+        tooltipPosition="top"
         (onClick)="openReschedule()"
       />
     }

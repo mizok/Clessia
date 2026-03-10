@@ -6,9 +6,11 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { ButtonModule } from 'primeng/button';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
+import { TooltipModule } from 'primeng/tooltip';
 import { DynamicDialogConfig, DynamicDialogRef, DialogService } from 'primeng/dynamicdialog';
 import { Session, ScheduleChange, SessionsService } from '@core/sessions.service';
 import { OverlayContainerService } from '@core/overlay-container.service';
@@ -19,7 +21,7 @@ import { isPast } from 'date-fns';
 
 @Component({
   selector: 'app-session-detail-dialog',
-  imports: [ButtonModule, SkeletonModule, TagModule],
+  imports: [DatePipe, ButtonModule, SkeletonModule, TagModule, TooltipModule],
   templateUrl: './session-detail-dialog.component.html',
   styleUrl: './session-detail-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
