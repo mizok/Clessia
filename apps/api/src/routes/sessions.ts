@@ -93,8 +93,11 @@ const SessionChangeItemSchema = z
     newSessionDate: DateSchema.nullable(),
     newStartTime: TimeSchema.nullable(),
     newEndTime: TimeSchema.nullable(),
+    originalTeacherId: z.uuid().nullable(),
+    originalTeacherName: z.string().nullable(),
     substituteTeacherId: z.uuid().nullable(),
     substituteTeacherName: z.string().nullable(),
+    operationSource: z.enum(['single', 'batch']),
     reason: z.string().nullable(),
     createdByName: z.string().nullable(),
     createdAt: z.string(),
@@ -277,7 +280,17 @@ function mapSession(row: Record<string, unknown>, hasChanges: boolean) {
   };
 }
 
-function mapSessionChange(row: Record<string, unknown>) {
+export const SESSION_CHANGES_SELECT = `
+      id, change_type,
+      original_session_date, original_start_time, original_end_time,
+      new_session_date, new_start_time, new_end_time,
+      original_teacher_id, original_teacher_name,
+      operation_source,
+      reason, created_by_name, created_at,
+      staff!substitute_teacher_id ( id, display_name )
+    `;
+
+export function mapSessionChange(row: Record<string, unknown>) {
   const substituteRaw = row['staff'] as Record<string, unknown> | Record<string, unknown>[] | null;
   const substituteTeacher = Array.isArray(substituteRaw)
     ? (substituteRaw[0] as Record<string, unknown> | undefined)
@@ -285,15 +298,20 @@ function mapSessionChange(row: Record<string, unknown>) {
 
   return {
     id: row['id'] as string,
-    changeType: row['change_type'] as 'reschedule' | 'substitute' | 'cancellation',
+    changeType: row['change_type'] as 'reschedule' | 'substitute' | 'cancellation' | 'uncancel',
     originalSessionDate: (row['original_session_date'] as string | null) ?? null,
     originalStartTime: toHHmm(row['original_start_time'] as string | null),
     originalEndTime: toHHmm(row['original_end_time'] as string | null),
     newSessionDate: (row['new_session_date'] as string | null) ?? null,
     newStartTime: toHHmm(row['new_start_time'] as string | null),
     newEndTime: toHHmm(row['new_end_time'] as string | null),
+    originalTeacherId: (row['original_teacher_id'] as string | null) ?? null,
+    originalTeacherName: (row['original_teacher_name'] as string | null) ?? null,
     substituteTeacherId: (substituteTeacher?.['id'] as string | undefined) ?? null,
     substituteTeacherName: (substituteTeacher?.['display_name'] as string | undefined) ?? null,
+    operationSource: ((row['operation_source'] as 'single' | 'batch' | null) ?? 'single') as
+      | 'single'
+      | 'batch',
     reason: (row['reason'] as string | null) ?? null,
     createdByName: (row['created_by_name'] as string | null) ?? null,
     createdAt: row['created_at'] as string,
@@ -501,15 +519,7 @@ app.openapi(getSessionChangesRoute, async (c) => {
 
   const { data, error } = await supabase
     .from('schedule_changes')
-    .select(
-      `
-      id, change_type,
-      original_session_date, original_start_time, original_end_time,
-      new_session_date, new_start_time, new_end_time,
-      reason, created_by_name, created_at,
-      staff!substitute_teacher_id ( id, display_name )
-    `,
-    )
+    .select(SESSION_CHANGES_SELECT)
     .eq('org_id', orgId)
     .eq('session_id', id)
     .order('created_at', { ascending: false });
