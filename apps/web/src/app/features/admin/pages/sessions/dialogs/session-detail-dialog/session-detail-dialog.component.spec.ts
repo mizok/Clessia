@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DynamicDialogConfig, DynamicDialogRef } from 'primeng/dynamicdialog';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 import {
   SessionsService,
@@ -146,6 +146,21 @@ describe('SessionDetailDialogComponent', () => {
     dialogConfigValue.data.changes = [];
     createComponent();
 
+    const text = fixture.nativeElement.textContent as string;
+
     expect(fixture.nativeElement.querySelector('.session-detail__empty')).not.toBeNull();
+    expect(text).toContain('尚無異動紀錄');
+    expect(text).toContain('此課堂自建立後未曾調課、停課、代課或恢復停課');
+  });
+
+  it('renders an error state when loading changes fails', () => {
+    dialogConfigValue.data.changes = [];
+    dialogConfigValue.data.loadingChanges = true;
+    getChangesSpy.mockReturnValue(throwError(() => new Error('load failed')));
+    createComponent();
+
+    const text = fixture.nativeElement.textContent as string;
+
+    expect(text).toContain('異動紀錄載入失敗');
   });
 });

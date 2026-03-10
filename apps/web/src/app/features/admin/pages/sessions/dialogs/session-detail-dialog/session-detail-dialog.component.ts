@@ -35,6 +35,7 @@ export class SessionDetailDialogComponent implements OnInit {
   protected readonly session = signal<Session | null>(null);
   protected readonly sessionChanges = signal<ScheduleChange[]>([]);
   protected readonly loadingChanges = signal(false);
+  protected readonly loadError = signal(false);
 
   protected readonly statusLabel = computed(() => {
     const s = this.session();
@@ -82,15 +83,18 @@ export class SessionDetailDialogComponent implements OnInit {
     if (this.config.data?.loadingChanges !== undefined) {
       this.loadingChanges.set(this.config.data.loadingChanges);
     }
+    this.loadError.set(false);
 
     const s = this.session();
     if (s && this.loadingChanges()) {
       this.sessionsService.getChanges(s.id).subscribe({
         next: (res: { data: ScheduleChange[] }) => {
           this.sessionChanges.set(res.data);
+          this.loadError.set(false);
           this.loadingChanges.set(false);
         },
         error: () => {
+          this.loadError.set(true);
           this.loadingChanges.set(false);
         },
       });

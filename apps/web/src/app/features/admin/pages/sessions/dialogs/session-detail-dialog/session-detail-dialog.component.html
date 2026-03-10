@@ -54,6 +54,12 @@
         <p-skeleton height="76px" borderRadius="10px" />
         <p-skeleton height="76px" borderRadius="10px" />
       </div>
+    } @else if (loadError()) {
+      <div class="session-detail__empty session-detail__empty--error">
+        <i class="pi pi-exclamation-circle session-detail__empty-icon"></i>
+        <p class="session-detail__empty-title">異動紀錄載入失敗</p>
+        <p class="session-detail__empty-description">請稍後再試，或重新開啟此課堂視窗。</p>
+      </div>
     } @else if (sessionChanges().length > 0) {
       <div class="session-detail__timeline">
         @for (c of sessionChanges(); track c.id) {
@@ -82,7 +88,8 @@
     } @else {
       <div class="session-detail__empty">
         <i class="pi pi-history session-detail__empty-icon"></i>
-        <p class="session-detail__empty-title">目前沒有可顯示的異動事件</p>
+        <p class="session-detail__empty-title">尚無異動紀錄</p>
+        <p class="session-detail__empty-description">此課堂自建立後未曾調課、停課、代課或恢復停課</p>
       </div>
     }
   </section>
