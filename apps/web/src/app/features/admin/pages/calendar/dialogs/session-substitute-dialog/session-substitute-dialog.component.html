@@ -6,7 +6,7 @@
     <p-select
       id="substituteTeacher"
       formControlName="teacherId"
-      [options]="teachers()"
+      [options]="teacherOptions()"
       optionLabel="displayName"
       optionValue="id"
       placeholder="選擇代課老師"
@@ -16,13 +16,14 @@
       filterBy="displayName"
       [loading]="loadingTeachers()"
     >
-      <ng-template #option let-t>
-        <div class="flex items-center gap-2">
-          <span>{{ t.displayName }}</span>
+      <ng-template pTemplate="item" let-item>
+        <div class="sub-teacher-option">
+          <span>{{ item.displayName }}</span>
+          <span class="sub-teacher-option__count">本週 {{ item.weeklySessionCount }} 堂</span>
         </div>
       </ng-template>
     </p-select>
-    @if (!loadingTeachers() && teachers().length === 0) {
+    @if (!loadingTeachers() && teacherOptions().length === 0) {
       <p class="cal-op-form__hint">目前沒有符合該課堂分校與科目的代課老師。</p>
     }
   </div>

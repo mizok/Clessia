@@ -6,9 +6,16 @@ import { SelectModule } from 'primeng/select';
 import { DynamicDialogConfig, DynamicDialogRef } from 'primeng/dynamicdialog';
 import { MessageService } from 'primeng/api';
 import { Session, SessionsService } from '@core/sessions.service';
-import { StaffService, Staff } from '@core/staff.service';
+import { StaffService } from '@core/staff.service';
 import { CoursesService } from '@core/courses.service';
 import { forkJoin } from 'rxjs';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
+
+interface TeacherOption {
+  readonly id: string;
+  readonly displayName: string;
+  readonly weeklySessionCount: number;
+}
 
 @Component({
   selector: 'app-session-substitute-dialog',
@@ -27,7 +34,7 @@ export class SessionSubstituteDialogComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
 
   readonly session = signal<Session | null>(null);
-  readonly teachers = signal<Staff[]>([]);
+  readonly teacherOptions = signal<TeacherOption[]>([]);
   readonly loadingTeachers = signal(false);
   readonly isSubmitting = signal(false);
 
@@ -45,25 +52,42 @@ export class SessionSubstituteDialogComponent implements OnInit {
 
   private loadTeachers() {
     const s = this.session();
-    if (!s) {
-      this.teachers.set([]);
-      return;
-    }
+    if (!s) { this.teacherOptions.set([]); return; }
 
     this.loadingTeachers.set(true);
+    const weekStart = startOfWeek(new Date(`${s.sessionDate}T00:00:00`), { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+
     forkJoin({
       teachersRes: this.staffService.list({ role: 'teacher', campusId: s.campusId }),
       courseRes: this.coursesService.get(s.courseId),
+      weekSessions: this.sessionsService.list({
+        from: format(weekStart, 'yyyy-MM-dd'),
+        to: format(weekEnd, 'yyyy-MM-dd'),
+        campusId: s.campusId,
+      }),
     }).subscribe({
-      next: ({ teachersRes, courseRes }) => {
+      next: ({ teachersRes, courseRes, weekSessions }) => {
         const subjectId = courseRes.data.subjectId;
-        const available = teachersRes.data.filter(
-          (teacher) =>
-            teacher.id !== s.teacherId &&
-            teacher.campusIds.includes(s.campusId) &&
-            teacher.subjectIds.includes(subjectId),
-        );
-        this.teachers.set(available);
+        const countMap = new Map<string, number>();
+        weekSessions.data.forEach(session => {
+          if (session.teacherId && session.status === 'scheduled') {
+            countMap.set(session.teacherId, (countMap.get(session.teacherId) ?? 0) + 1);
+          }
+        });
+        const available = teachersRes.data
+          .filter(t =>
+            t.id !== s.teacherId &&
+            t.campusIds.includes(s.campusId) &&
+            t.subjectIds.includes(subjectId),
+          )
+          .map(t => ({
+            id: t.id,
+            displayName: t.displayName,
+            weeklySessionCount: countMap.get(t.id) ?? 0,
+          }))
+          .sort((a, b) => a.weeklySessionCount - b.weeklySessionCount);
+        this.teacherOptions.set(available);
         this.loadingTeachers.set(false);
       },
       error: () => this.loadingTeachers.set(false),
