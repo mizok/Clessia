@@ -70,7 +70,7 @@ export class SessionsPage implements OnInit {
   private readonly coursesService = inject(CoursesService);
   private readonly staffService = inject(StaffService);
   private readonly sessionsService = inject(SessionsService);
-  private readonly calendarActionsService = inject(SessionsActionsService);
+  private readonly sessionsActionsService = inject(SessionsActionsService);
   private readonly messageService = inject(MessageService);
   private readonly overlayContainerService = inject(OverlayContainerService);
   private readonly dialogService = inject(DialogService);
@@ -364,7 +364,7 @@ export class SessionsPage implements OnInit {
   }
 
   protected uncancelSingle(session: Session): void {
-    this.calendarActionsService.uncancelSingle(session.id).subscribe({
+    this.sessionsActionsService.uncancelSingle(session.id).subscribe({
       next: () => {
         this.loadSessions();
         this.messageService.add({ severity: 'success', summary: '已取消停課', detail: `${session.className} ${session.sessionDate}` });

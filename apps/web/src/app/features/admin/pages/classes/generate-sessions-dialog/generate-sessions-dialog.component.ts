@@ -135,7 +135,7 @@ export class GenerateSessionsDialogComponent {
     this.ref.close('refresh');
   }
 
-  protected goToCalendarList(): void {
+  protected goToSessionsList(): void {
     const c = this.cls();
     const from = this.generateFrom();
     const to = this.generateTo();

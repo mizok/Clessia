@@ -43,7 +43,7 @@ export interface MobileBatchDialogResult {
 export class MobileBatchDialogComponent implements OnInit {
   private readonly config = inject(DynamicDialogConfig<MobileBatchDialogData>);
   private readonly ref = inject(DynamicDialogRef);
-  private readonly calendarActionsService = inject(SessionsActionsService);
+  private readonly sessionsActionsService = inject(SessionsActionsService);
   private readonly messageService = inject(MessageService);
 
   protected readonly teachers = signal<Staff[]>([]);
@@ -102,7 +102,7 @@ export class MobileBatchDialogComponent implements OnInit {
     if (ids.length === 0) return;
     this.batchLoading.set(true);
 
-    const obs = this.calendarActionsService.previewBatch(this.toBatchRequest());
+    const obs = this.sessionsActionsService.previewBatch(this.toBatchRequest());
     if (!obs) return;
 
     obs.subscribe({
@@ -122,7 +122,7 @@ export class MobileBatchDialogComponent implements OnInit {
     if (ids.length === 0) return;
     this.batchLoading.set(true);
 
-    const obs = this.calendarActionsService.applyBatch(this.toBatchRequest());
+    const obs = this.sessionsActionsService.applyBatch(this.toBatchRequest());
     if (!obs) return;
 
     obs.subscribe({

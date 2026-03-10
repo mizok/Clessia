@@ -130,7 +130,7 @@ describe('ClassesPage', () => {
       updatedAt: '2026-01-01T00:00:00.000Z',
     } as Class;
 
-    (component as unknown as { navigateToCalendarList: (target: Class) => void }).navigateToCalendarList(
+    (component as unknown as { navigateToSessionsList: (target: Class) => void }).navigateToSessionsList(
       cls,
     );
 
@@ -168,7 +168,7 @@ describe('ClassesPage', () => {
       updatedAt: '2026-01-01T00:00:00.000Z',
     } as Class;
 
-    (component as unknown as { navigateToCalendarList: (target: Class) => void }).navigateToCalendarList(
+    (component as unknown as { navigateToSessionsList: (target: Class) => void }).navigateToSessionsList(
       cls,
     );
 

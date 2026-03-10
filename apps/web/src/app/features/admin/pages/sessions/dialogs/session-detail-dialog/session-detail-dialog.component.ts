@@ -38,7 +38,7 @@ export class SessionDetailDialogComponent implements OnInit {
   readonly sessionChanges = signal<ScheduleChange[]>([]);
   readonly loadingChanges = signal(false);
 
-  // Status computation logic moved from calendar.page
+  // Status computation logic moved from sessions.page
   readonly statusLabel = computed(() => {
     const s = this.session();
     if (!s) return '';

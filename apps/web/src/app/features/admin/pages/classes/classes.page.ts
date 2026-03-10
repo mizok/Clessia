@@ -366,7 +366,7 @@ export class ClassesPage implements OnInit {
       {
         label: '在列表中查看',
         icon: 'pi pi-calendar',
-        command: () => this.navigateToCalendarList(cls),
+        command: () => this.navigateToSessionsList(cls),
       },
       {
         separator: true,
@@ -741,7 +741,7 @@ export class ClassesPage implements OnInit {
       });
   }
 
-  protected navigateToCalendarList(cls: Class): void {
+  protected navigateToSessionsList(cls: Class): void {
     this.sessionsService
       .list({
         classId: cls.id,
@@ -754,15 +754,15 @@ export class ClassesPage implements OnInit {
           const firstSessionDate = sessions[0]?.sessionDate;
           const lastSessionDate = sessions[sessions.length - 1]?.sessionDate;
 
-          this.openCalendarList(cls, firstSessionDate, lastSessionDate);
+          this.openSessionsList(cls, firstSessionDate, lastSessionDate);
         },
         error: () => {
-          this.openCalendarList(cls);
+          this.openSessionsList(cls);
         },
       });
   }
 
-  private openCalendarList(cls: Class, from?: string, to?: string): void {
+  private openSessionsList(cls: Class, from?: string, to?: string): void {
     this.router.navigate(['/admin/sessions'], {
       queryParams: {
         classId: cls.id,
