@@ -819,13 +819,17 @@ export class ClassesPage implements OnInit {
   }
 
   protected confirmDeleteClass(cls: Class): void {
-    const hasHistory = (cls.scheduleCount ?? 0) > 0;
-    const message = hasHistory
-      ? `確定要刪除班級「${cls.name}」嗎？歷史課堂、出席紀錄與報名資料將一併刪除。此操作無法復原。`
-      : `確定要刪除班級「${cls.name}」嗎？此操作無法復原。`;
+    if (cls.hasPastSessions) {
+      this.messageService.add({
+        severity: 'warn',
+        summary: '無法刪除班級',
+        detail: '此班級已有歷史課堂記錄，請改為停用',
+      });
+      return;
+    }
 
     this.confirmationService.confirm({
-      message,
+      message: `確定要刪除班級「${cls.name}」嗎？此操作無法復原。`,
       header: '確認刪除',
       icon: 'pi pi-exclamation-triangle',
       acceptLabel: '刪除',

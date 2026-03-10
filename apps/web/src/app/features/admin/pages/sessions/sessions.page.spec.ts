@@ -14,6 +14,7 @@ import { SessionAssignDialogComponent } from './dialogs/session-assign-dialog/se
 describe('SessionsPage', () => {
   let component: SessionsPage;
   let fixture: ComponentFixture<SessionsPage>;
+  let routeQueryParams: Record<string, string>;
   const sessionsServiceMock = {
     list: vi.fn(() => of({ data: [] })),
     batchAssignTeacher: vi.fn(() =>
@@ -31,6 +32,7 @@ describe('SessionsPage', () => {
   };
 
   beforeEach(async () => {
+    routeQueryParams = {};
     sessionsServiceMock.list.mockClear();
     sessionsServiceMock.batchAssignTeacher.mockClear();
     sessionsServiceMock.batchUpdateTime.mockClear();
@@ -42,7 +44,11 @@ describe('SessionsPage', () => {
       providers: [
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { queryParams: {} } },
+          useValue: {
+            get snapshot() {
+              return { queryParams: routeQueryParams };
+            },
+          },
         },
         {
           provide: CampusesService,
@@ -122,16 +128,16 @@ describe('SessionsPage', () => {
   it('availableTeachers should only include assigned teachers after selecting course', () => {
     (
       component as unknown as {
-        selectedCampusId: { set: (value: string | null) => void };
-        selectedCourseId: { set: (value: string | null) => void };
+        selectedCampusIds: { set: (value: string[]) => void };
+        selectedCourseIds: { set: (value: string[]) => void };
       }
-    ).selectedCampusId.set('campus-1');
+    ).selectedCampusIds.set(['campus-1']);
     (
       component as unknown as {
-        selectedCampusId: { set: (value: string | null) => void };
-        selectedCourseId: { set: (value: string | null) => void };
+        selectedCampusIds: { set: (value: string[]) => void };
+        selectedCourseIds: { set: (value: string[]) => void };
       }
-    ).selectedCourseId.set('course-math');
+    ).selectedCourseIds.set(['course-math']);
 
     (
       component as unknown as {
@@ -228,5 +234,43 @@ describe('SessionsPage', () => {
     ).availableTeachers();
 
     expect(availableTeachers.map((teacher) => teacher.id)).toEqual(['teacher-a']);
+  });
+
+  it('marks date range as active when initialized from query params', async () => {
+    routeQueryParams = {
+      campusId: 'campus-1',
+      courseId: 'course-1',
+      classId: 'class-1',
+      from: '2026-02-10',
+      to: '2026-06-18',
+    };
+
+    fixture = TestBed.createComponent(SessionsPage);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('page', {
+      label: 'Test',
+      relativePath: '',
+      absolutePath: '',
+      role: undefined,
+      icon: '',
+      showInMenu: true,
+    });
+    await fixture.whenStable();
+
+    const listDateRange = (
+      component as unknown as { listDateRange: () => Date[] }
+    ).listDateRange();
+    const activeFilterCount = (
+      component as unknown as { activeFilterCount: () => number }
+    ).activeFilterCount();
+    const hasActiveFilters = (
+      component as unknown as { hasActiveFilters: () => boolean }
+    ).hasActiveFilters();
+
+    expect(listDateRange).toHaveLength(2);
+    expect(listDateRange[0]?.toISOString()).toContain('2026-02-10');
+    expect(listDateRange[1]?.toISOString()).toContain('2026-06-18');
+    expect(activeFilterCount).toBe(3);
+    expect(hasActiveFilters).toBe(true);
   });
 });

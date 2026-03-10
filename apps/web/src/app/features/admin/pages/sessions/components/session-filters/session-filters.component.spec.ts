@@ -24,7 +24,7 @@ describe('SessionFiltersComponent', () => {
   });
 
   it('should filter teachers by selected course subject', () => {
-    fixture.componentRef.setInput('selectedCourseId', 'course-math');
+    fixture.componentRef.setInput('selectedCourseIds', ['course-math']);
     fixture.componentRef.setInput('availableCourses', [
       buildCourse({ id: 'course-math', subjectId: 'subject-math' }),
       buildCourse({ id: 'course-english', subjectId: 'subject-english' }),
@@ -39,21 +39,19 @@ describe('SessionFiltersComponent', () => {
     expect(teachers.map((teacher) => teacher.id)).toEqual(['teacher-1']);
   });
 
-  it('should emit normalized course id from select object', () => {
-    let emitted: string | null = 'pending';
-    component.courseChange.subscribe((value) => {
+  it('should emit normalized course ids from multi-select values', () => {
+    let emitted: string[] = [];
+    component.courseIdsChange.subscribe((value: string[]) => {
       emitted = value;
     });
 
     (
       component as unknown as {
-        onCourseSelectChange: (value: string | Course | null) => void;
+        onCourseMultiChange: (values: readonly (string | Course)[]) => void;
       }
-    ).onCourseSelectChange({
-      ...buildCourse({ id: 'course-1' }),
-    });
+    ).onCourseMultiChange(['course-1', buildCourse({ id: 'course-2' }), buildCourse({ id: 'course-1' })]);
 
-    expect(emitted).toBe('course-1');
+    expect(emitted).toEqual(['course-1', 'course-2']);
   });
 
   it('should emit normalized teacher ids for multi-select values', () => {

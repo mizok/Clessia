@@ -163,9 +163,7 @@ export const routes: Routes = [
           },
           {
             path: RoutesCatalog.ADMIN_COURSES.relativePath,
-            loadComponent: () =>
-              import('@features/admin/pages/courses/courses.page').then((m) => m.CoursesPage),
-            data: { page: RoutesCatalog.ADMIN_COURSES },
+            redirectTo: RoutesCatalog.ADMIN_CLASSES.relativePath,
           },
           {
             path: RoutesCatalog.ADMIN_SCHEDULE.relativePath,

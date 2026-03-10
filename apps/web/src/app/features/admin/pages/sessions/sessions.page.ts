@@ -462,6 +462,7 @@ export class SessionsPage implements OnInit {
     if (params['from']) {
       const fromDate = new Date(params['from']);
       this.listDateRange.set([fromDate, params['to'] ? new Date(params['to']) : endOfMonth(fromDate)]);
+      this.listDateRangeModified.set(true);
     }
     if (params['assignmentStatus'] === 'unassigned') {
       this.selectedTeacherIds.set(['__unassigned__']);

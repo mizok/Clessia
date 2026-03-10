@@ -19,6 +19,9 @@ describe('ClassesPage', () => {
   let fixture: ComponentFixture<ClassesPage>;
   let component: ClassesPage;
   let router: Router;
+  const confirmationServiceMock = {
+    confirm: vi.fn(),
+  };
 
   const coursesServiceMock = {
     list: vi.fn(() => of({ data: [] })),
@@ -81,6 +84,7 @@ describe('ClassesPage', () => {
 
   beforeEach(async () => {
     sessionsServiceMock.list.mockClear();
+    confirmationServiceMock.confirm.mockClear();
 
     await TestBed.configureTestingModule({
       imports: [ClassesPage],
@@ -96,7 +100,7 @@ describe('ClassesPage', () => {
         { provide: BrowserStateService, useValue: { isMobile: () => false } },
         { provide: DialogService, useValue: { open: vi.fn() } },
         { provide: MessageService, useValue: { add: vi.fn() } },
-        { provide: ConfirmationService, useValue: { confirm: vi.fn() } },
+        { provide: ConfirmationService, useValue: confirmationServiceMock },
       ],
     }).compileComponents();
 
@@ -136,12 +140,11 @@ describe('ClassesPage', () => {
 
     expect(sessionsServiceMock.list).toHaveBeenCalledWith({
       classId: 'class-1',
-      campusId: 'campus-1',
-      courseId: 'course-1',
+      campusIds: ['campus-1'],
+      courseIds: ['course-1'],
     });
     expect(navigateSpy).toHaveBeenCalledWith(['/admin/sessions'], {
       queryParams: {
-        view: 'list',
         classId: 'class-1',
         campusId: 'campus-1',
         courseId: 'course-1',
@@ -174,11 +177,40 @@ describe('ClassesPage', () => {
 
     expect(navigateSpy).toHaveBeenCalledWith(['/admin/sessions'], {
       queryParams: {
-        view: 'list',
         classId: 'class-1',
         campusId: 'campus-1',
         courseId: 'course-1',
       },
     });
+  });
+
+  it('uses hasPastSessions instead of scheduleCount for delete warning copy', () => {
+    const confirmationService = fixture.debugElement.injector.get(ConfirmationService);
+    const confirmSpy = vi.spyOn(confirmationService, 'confirm');
+    const cls = {
+      id: 'class-2',
+      campusId: 'campus-1',
+      courseId: 'course-1',
+      name: '英文 B 班',
+      maxStudents: 20,
+      gradeLevels: [],
+      nextClassId: null,
+      isActive: true,
+      orgId: 'org-1',
+      scheduleCount: 2,
+      hasPastSessions: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } as Class;
+
+    (
+      component as unknown as { confirmDeleteClass: (target: Class) => void }
+    ).confirmDeleteClass(cls);
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: '確定要刪除班級「英文 B 班」嗎？此操作無法復原。',
+      }),
+    );
   });
 });
