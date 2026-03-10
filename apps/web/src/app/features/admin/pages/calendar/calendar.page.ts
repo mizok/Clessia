@@ -583,9 +583,16 @@ export class CalendarPage implements OnInit {
 
     if (ref) {
       ref.onClose.subscribe((result) => {
-        // If a dialog closed with 'refresh', reload sessions
-        if (result === 'refresh') {
+        if (result === 'refresh' || result === 'cancelled') {
           this.loadSessions();
+        }
+        if (result === 'cancelled') {
+          this.messageService.add({
+            severity: 'success',
+            summary: '已停課',
+            detail: '如需安排補課，請至行事曆清單視圖新增調課',
+            life: 6000,
+          });
         }
       });
     }
