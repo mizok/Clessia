@@ -3,8 +3,8 @@ import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { TextareaModule } from 'primeng/textarea';
 import { DynamicDialogConfig, DynamicDialogRef } from 'primeng/dynamicdialog';
-import { MessageService } from 'primeng/api';
-import { Session, SessionsService } from '@core/sessions.service';
+import type { Session } from '@core/sessions.service';
+import { SessionsService } from '@core/sessions.service';
 
 @Component({
   selector: 'app-session-cancel-dialog',
@@ -17,7 +17,6 @@ export class SessionCancelDialogComponent implements OnInit {
   private readonly config = inject(DynamicDialogConfig);
   private readonly ref = inject(DynamicDialogRef);
   private readonly sessionsService = inject(SessionsService);
-  private readonly messageService = inject(MessageService);
   private readonly fb = inject(FormBuilder);
 
   readonly session = signal<Session | null>(null);
@@ -46,13 +45,7 @@ export class SessionCancelDialogComponent implements OnInit {
 
     this.sessionsService.cancel(s.id, reason).subscribe({
       next: () => {
-        this.messageService.add({
-          severity: 'success',
-          summary: '成功',
-          detail: '已成功停課',
-        });
-        // We close with 'refresh' to indicate to the caller that it needs to reload
-        this.ref.close('refresh');
+        this.ref.close({ result: 'refresh', session: s });
       },
       error: () => {
         this.messageService.add({

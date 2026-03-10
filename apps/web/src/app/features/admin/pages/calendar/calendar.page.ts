@@ -473,8 +473,17 @@ export class CalendarPage implements OnInit {
       data: { session },
       styleClass: 'cal-dialog',
     });
-    ref?.onClose.subscribe((result) => {
-      if (result === 'refresh') this.loadSessions();
+    ref?.onClose.subscribe((result?: { result: string } | string) => {
+      const didRefresh = typeof result === 'string' ? result === 'refresh' : result?.result === 'refresh';
+      if (didRefresh) {
+        this.loadSessions();
+        this.messageService.add({
+          severity: 'success',
+          summary: '已停課',
+          detail: '如需安排補課，請至行事曆清單視圖新增調課',
+          life: 6000,
+        });
+      }
     });
   }
 

@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
@@ -25,12 +26,13 @@ import { isPast } from 'date-fns';
   templateUrl: './session-detail-dialog.component.html',
   styleUrl: './session-detail-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [DialogService],
+  providers: [DialogService, MessageService],
 })
 export class SessionDetailDialogComponent implements OnInit {
   private readonly config = inject(DynamicDialogConfig);
   private readonly ref = inject(DynamicDialogRef);
   private readonly dialogService = inject(DialogService);
+  private readonly messageService = inject(MessageService);
   private readonly overlayContainer = inject(OverlayContainerService);
   private readonly sessionsService = inject(SessionsService);
 
@@ -123,12 +125,22 @@ export class SessionDetailDialogComponent implements OnInit {
   protected openCancel(): void {
     const s = this.session();
     if (!s) return;
-    this.ref.close(); // Close detail to open cancel
-    this.dialogService.open(SessionCancelDialogComponent, {
+    const cancelRef = this.dialogService.open(SessionCancelDialogComponent, {
       header: '停課',
       width: '400px',
       data: { session: s },
       styleClass: 'cal-dialog',
+    });
+    cancelRef.onClose.subscribe((result?: { result: string; session: Session }) => {
+      if (result?.result === 'refresh') {
+        this.ref.close('refresh');
+        this.messageService.add({
+          severity: 'success',
+          summary: '已停課',
+          detail: '如需安排補課，請至行事曆清單視圖新增調課',
+          life: 6000,
+        });
+      }
     });
   }
 
