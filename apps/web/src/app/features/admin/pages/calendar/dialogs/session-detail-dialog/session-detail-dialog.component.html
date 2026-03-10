@@ -15,7 +15,11 @@
     </div>
     <div class="cal-detail__row">
       <i class="pi pi-user cal-detail__icon"></i>
-      <span>{{ session()?.teacherName }}</span>
+      @if (session()?.assignmentStatus === 'unassigned') {
+        <span class="cal-detail__unassigned">未指派</span>
+      } @else {
+        <span>{{ session()?.teacherName }}</span>
+      }
     </div>
     <div class="cal-detail__row">
       <i class="pi pi-info-circle cal-detail__icon"></i>

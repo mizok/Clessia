@@ -916,6 +916,11 @@ textarea.p-textarea,
     font-style: italic;
   }
 
+  &__unassigned {
+    font-weight: var(--font-semibold);
+    color: var(--p-orange-500);
+  }
+
   &__by {
     font-size: var(--text-xs);
     color: var(--zinc-400);
