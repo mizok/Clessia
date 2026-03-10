@@ -57,6 +57,19 @@ export class SessionListComponent {
     return Math.floor((total - 1) / rows) * rows;
   });
 
+  protected readonly sessionCountLabel = computed(() => {
+    const total = this.sessions().length;
+    if (total === 0) return '';
+    const cancelled = this.sessions().filter(s => s.status === 'cancelled').length;
+    const unassigned = this.sessions().filter(
+      s => s.assignmentStatus === 'unassigned' && s.status === 'scheduled'
+    ).length;
+    const parts = [`共 ${total} 堂`];
+    if (unassigned > 0) parts.push(`${unassigned} 堂未指派`);
+    if (cancelled > 0) parts.push(`${cancelled} 堂已停課`);
+    return parts.join('・');
+  });
+
   protected readonly listPagination = computed<ResponsiveTablePaginationConfig>(() => ({
     first: this.paginatedFirst(),
     rows: this.rows(),

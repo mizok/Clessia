@@ -6,6 +6,9 @@
       }
     </div>
   } @else {
+    @if (sessionCountLabel()) {
+      <p class="session-list__count">{{ sessionCountLabel() }}</p>
+    }
     <app-responsive-table
       class="session-list__table"
       [headTemplate]="listHead"
