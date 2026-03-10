@@ -30,6 +30,7 @@
       [selectedClassId]="selectedClassId()"
       [activeFilterCount]="activeFilterCount()"
       [hasActiveFilters]="hasActiveFilters()"
+      [showOnlyUnassigned]="showOnlyUnassigned()"
       (listDateRangeChange)="onListDateRangeChange($event)"
       (mobileFilterToggle)="toggleMobileFilters()"
       (campusChange)="onCampusChange($event)"
@@ -37,13 +38,14 @@
       (teacherIdsChange)="onTeacherIdsChange($event)"
       (classChange)="onClassChange($event)"
       (clearFilters)="clearFilters()"
+      (showOnlyUnassignedChange)="showOnlyUnassigned.set($event)"
     />
   </section>
 
   <app-calendar-body
     [viewMode]="viewMode()"
     [loading]="loading()"
-    [sessions]="sessions()"
+    [sessions]="filteredSessions()"
     [selectedIds]="selectedIds()"
     [selectedCount]="selectedCount()"
     [isWeekView]="isWeekView()"

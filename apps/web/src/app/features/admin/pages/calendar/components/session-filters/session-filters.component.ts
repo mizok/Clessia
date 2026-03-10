@@ -37,8 +37,10 @@ export class SessionFiltersComponent {
 
   readonly activeFilterCount = input(0);
   readonly hasActiveFilters = input(false);
+  readonly showOnlyUnassigned = input(false);
 
   readonly listDateRangeChange = output<Date[]>();
+  readonly showOnlyUnassignedChange = output<boolean>();
   readonly mobileFilterToggle = output<void>();
   readonly campusChange = output<string | null>();
   readonly courseChange = output<string | null>();

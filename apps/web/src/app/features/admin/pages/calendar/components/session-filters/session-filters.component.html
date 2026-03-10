@@ -54,6 +54,16 @@
         (ngModelChange)="onCampusSelectChange($event)"
       />
     }
+    @if (viewMode() === 'list') {
+      <p-button
+        [label]="showOnlyUnassigned() ? '顯示全部' : '僅未指派'"
+        [severity]="showOnlyUnassigned() ? 'warn' : 'secondary'"
+        [outlined]="!showOnlyUnassigned()"
+        size="small"
+        icon="pi pi-user-minus"
+        (onClick)="showOnlyUnassignedChange.emit(!showOnlyUnassigned())"
+      />
+    }
     @if (selectedCampusId() && availableCourses().length > 0) {
       <p-select
         class="session-filters__control"

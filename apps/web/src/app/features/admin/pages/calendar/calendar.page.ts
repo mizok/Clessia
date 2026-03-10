@@ -101,7 +101,7 @@ export class CalendarPage implements OnInit {
     if (this.selectedTeacherIds().length > 0) count++;
     if (this.selectedClassId()) count++;
     if (this.viewMode() === 'list' && this.listDateRangeModified()) count++;
-    if (this.viewMode() === 'list' && this.assignmentStatusFilter()) count++;
+    if (this.viewMode() === 'list' && this.showOnlyUnassigned()) count++;
     return count;
   });
 
@@ -131,7 +131,7 @@ export class CalendarPage implements OnInit {
   protected readonly selectedCourseId = signal<string | null>(null);
   protected readonly selectedTeacherIds = signal<string[]>([]);
   protected readonly selectedClassId = signal<string | null>(null);
-  protected readonly assignmentStatusFilter = signal<'unassigned' | null>(null);
+  protected readonly showOnlyUnassigned = signal(false);
 
   // ── List view date range (independent from calendar week/day) ──────────
   protected readonly listDateRange = signal<Date[]>(this.getDefaultListDateRange());
@@ -190,9 +190,15 @@ export class CalendarPage implements OnInit {
         this.selectedTeacherIds().length > 0 ||
         this.selectedClassId() ||
         (this.viewMode() === 'list' && this.listDateRangeModified()) ||
-        (this.viewMode() === 'list' && this.assignmentStatusFilter())
+        (this.viewMode() === 'list' && this.showOnlyUnassigned())
       ),
   );
+
+  protected readonly filteredSessions = computed(() => {
+    const sessions = this.sessions();
+    if (!this.showOnlyUnassigned()) return sessions;
+    return sessions.filter(s => s.assignmentStatus === 'unassigned' && s.status === 'scheduled');
+  });
 
   protected readonly weekStart = computed(() =>
     startOfWeek(this.currentDate(), { weekStartsOn: 1 }),
@@ -547,7 +553,7 @@ export class CalendarPage implements OnInit {
     this.selectedCourseId.set(null);
     this.selectedTeacherIds.set([]);
     this.selectedClassId.set(null);
-    this.assignmentStatusFilter.set(null);
+    this.showOnlyUnassigned.set(false);
     this.listDateRange.set(this.getDefaultListDateRange());
     this.listDateRangeModified.set(false);
     this.loadSessions();
@@ -612,7 +618,7 @@ export class CalendarPage implements OnInit {
       }
     }
     if (params['assignmentStatus'] === 'unassigned') {
-      this.assignmentStatusFilter.set('unassigned');
+      this.showOnlyUnassigned.set(true);
     }
   }
 
