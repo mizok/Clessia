@@ -13,7 +13,6 @@ describe('SessionsBodyComponent', () => {
 
     fixture = TestBed.createComponent(SessionsBodyComponent);
     component = fixture.componentInstance;
-    fixture.componentRef.setInput('currentDate', new Date('2026-03-07T00:00:00.000Z'));
     await fixture.whenStable();
   });
 
