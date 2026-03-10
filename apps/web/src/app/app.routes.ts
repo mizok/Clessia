@@ -162,10 +162,6 @@ export const routes: Routes = [
             data: { page: RoutesCatalog.ADMIN_PARENTS },
           },
           {
-            path: RoutesCatalog.ADMIN_COURSES.relativePath,
-            redirectTo: RoutesCatalog.ADMIN_CLASSES.relativePath,
-          },
-          {
             path: RoutesCatalog.ADMIN_SCHEDULE.relativePath,
             redirectTo: RoutesCatalog.ADMIN_SESSIONS.relativePath,
           },
