@@ -2,14 +2,14 @@
 <p-confirmDialog [appendTo]="overlayContainer" />
 <!-- 方法 1: 動態 Selector -->
 
-<div class="classes">
+<div class="courses">
   <!-- Page Header -->
-  <header class="classes__header">
-    <div class="classes__title-group">
-      <h1 class="classes__title">{{ page().label }}</h1>
-      <p class="classes__subtitle">層級管理課程與班級，設定上課時間</p>
+  <header class="courses__header">
+    <div class="courses__title-group">
+      <h1 class="courses__title">{{ page().label }}</h1>
+      <p class="courses__subtitle">層級管理課程與班級，設定上課時間</p>
     </div>
-    <div class="classes__header-actions">
+    <div class="courses__header-actions">
       <p-button
         label="操作紀錄"
         icon="pi pi-history"
@@ -22,12 +22,12 @@
   </header>
 
   <!-- Filter Bar -->
-  <div class="classes__card">
+  <div class="courses__card">
     @if (activeCampuses().length > 1) {
       <p-tabs
         [value]="selectedCampusId() ?? 'all'"
         (valueChange)="onCampusTabChange($event)"
-        styleClass="classes__campus-tabs"
+        styleClass="courses__campus-tabs"
       >
         <p-tablist>
           <p-tab value="all">全部</p-tab>
@@ -37,8 +37,8 @@
         </p-tablist>
       </p-tabs>
     }
-    <div class="classes__toolbar">
-      <label class="classes__select-all" pTooltip="全選 / 取消全選" tooltipPosition="top">
+    <div class="courses__toolbar">
+      <label class="courses__select-all" pTooltip="全選 / 取消全選" tooltipPosition="top">
         <input
           type="checkbox"
           class="batch-checkbox"
@@ -48,7 +48,7 @@
         />
       </label>
 
-      <div class="classes__search">
+      <div class="courses__search">
         <p-iconfield iconPosition="left">
           <p-inputicon styleClass="pi pi-search" />
           <input
@@ -61,14 +61,14 @@
         </p-iconfield>
       </div>
 
-      <div class="classes__filters">
+      <div class="courses__filters">
         <p-select
           [options]="subjectOptions()"
           [ngModel]="selectedSubjectId()"
           (ngModelChange)="selectedSubjectId.set($event)"
           placeholder="所有科目"
           [showClear]="true"
-          styleClass="classes__filter-select"
+          styleClass="courses__filter-select"
           [appendTo]="'body'"
         />
         <p-multiselect
@@ -79,7 +79,7 @@
           selectedItemsLabel="{0} 位老師"
           [filter]="true"
           filterPlaceholder="搜尋老師..."
-          styleClass="classes__filter-select"
+          styleClass="courses__filter-select"
           [appendTo]="overlayContainer"
         />
         <p-select
@@ -87,7 +87,7 @@
           [ngModel]="statusFilter()"
           (ngModelChange)="statusFilter.set($event)"
           placeholder="全部狀態"
-          styleClass="classes__filter-select"
+          styleClass="courses__filter-select"
           [appendTo]="'body'"
         />
       </div>
@@ -113,7 +113,7 @@
     </div>
 
     <!-- Content -->
-    <div class="classes__content">
+    <div class="courses__content">
       @if (loading()) {
         <!-- Skeleton -->
         <div class="skeleton-list">
@@ -150,7 +150,7 @@
         }
       } @else {
         <!-- Course Groups -->
-        <div class="classes__groups">
+        <div class="courses__groups">
           @for (group of paginatedCourseGroups(); track group.course.id) {
             <div class="course-group">
               <!-- Course Header -->
@@ -348,7 +348,7 @@
         </div>
 
         @if (courseGroups().length > paginationRows()) {
-          <div class="classes__pagination">
+          <div class="courses__pagination">
             <p-paginator
               [first]="paginationFirst()"
               [rows]="paginationRows()"
@@ -371,9 +371,9 @@
 
     <!-- Batch Action Bar -->
     @if (selectedClassIds().size > 0) {
-      <div class="classes__batch-bar">
-        <span class="classes__batch-count">已選 {{ selectedClassIds().size }} 個班級</span>
-        <div class="classes__batch-actions">
+      <div class="courses__batch-bar">
+        <span class="courses__batch-count">已選 {{ selectedClassIds().size }} 個班級</span>
+        <div class="courses__batch-actions">
           @if (selectedInactiveCount() > 0) {
             <p-button
               [label]="'啟用 ' + selectedInactiveCount() + ' 個'"

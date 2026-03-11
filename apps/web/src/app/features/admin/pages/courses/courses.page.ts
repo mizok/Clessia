@@ -27,12 +27,9 @@ import { SelectModule } from 'primeng/select';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
-import { DatePickerModule } from 'primeng/datepicker';
-import { ToggleSwitchModule } from 'primeng/toggleswitch';
-import { InputNumberModule } from 'primeng/inputnumber';
 import { PaginatorModule, type PaginatorState } from 'primeng/paginator';
 
-import { CourseFormDialogComponent } from '../courses/course-form-dialog.component';
+import { CourseFormDialogComponent } from './course-form-dialog.component';
 import { ClassFormDialogComponent } from './class-form-dialog/class-form-dialog.component';
 import { GenerateSessionsDialogComponent } from './generate-sessions-dialog/generate-sessions-dialog.component';
 // SessionListDialogComponent removed — replaced by sessions list view
@@ -60,7 +57,7 @@ interface CourseGroup {
 }
 
 @Component({
-  selector: 'app-classes',
+  selector: 'app-courses',
   standalone: true,
   imports: [
     CommonModule,
@@ -82,10 +79,10 @@ interface CourseGroup {
     EmptyStateComponent,
   ],
   providers: [MessageService, ConfirmationService, DialogService],
-  templateUrl: './classes.page.html',
-  styleUrl: './classes.page.scss',
+  templateUrl: './courses.page.html',
+  styleUrl: './courses.page.scss',
 })
-export class ClassesPage implements OnInit {
+export class CoursesPage implements OnInit {
   readonly page = input.required<RouteObj>();
 
   private readonly dialogService = inject(DialogService);
@@ -776,8 +773,7 @@ export class ClassesPage implements OnInit {
               session.assignmentStatus === 'unassigned' && session.status === 'scheduled',
           );
           const firstSessionDate = unassignedSessions[0]?.sessionDate;
-          const lastSessionDate =
-            unassignedSessions[unassignedSessions.length - 1]?.sessionDate;
+          const lastSessionDate = unassignedSessions[unassignedSessions.length - 1]?.sessionDate;
 
           this.openUnassignedSessionsList(cls, firstSessionDate, lastSessionDate);
         },

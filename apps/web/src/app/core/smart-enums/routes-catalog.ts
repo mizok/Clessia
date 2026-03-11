@@ -102,9 +102,9 @@ export class RoutesCatalog {
     'pi-bell',
   );
   // Group: 教務管理
-  public static readonly ADMIN_CLASSES = this.register(
-    'classes',
-    '/admin/classes',
+  public static readonly ADMIN_COURSES = this.register(
+    'courses',
+    '/admin/courses',
     '課程管理',
     UserType.ADMIN,
     'pi-users',
@@ -114,7 +114,7 @@ export class RoutesCatalog {
   public static readonly ADMIN_SESSIONS = this.register(
     'sessions',
     '/admin/sessions',
-    '課堂管理中心',
+    '課堂管理',
     UserType.ADMIN,
     'pi-list',
     true,

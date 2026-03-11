@@ -5,7 +5,7 @@ import { vi } from 'vitest';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { DialogService } from 'primeng/dynamicdialog';
 
-import { ClassesPage } from './classes.page';
+import { CoursesPage } from './courses.page';
 import { CoursesService } from '@core/courses.service';
 import { ClassesService, type Class } from '@core/classes.service';
 import { CampusesService } from '@core/campuses.service';
@@ -15,9 +15,9 @@ import { SessionsService, type Session } from '@core/sessions.service';
 import { OverlayContainerService } from '@core/overlay-container.service';
 import { BrowserStateService } from '@core/browser-state.service';
 
-describe('ClassesPage', () => {
-  let fixture: ComponentFixture<ClassesPage>;
-  let component: ClassesPage;
+describe('CoursesPage', () => {
+  let fixture: ComponentFixture<CoursesPage>;
+  let component: CoursesPage;
   let router: Router;
   const confirmationServiceMock = {
     confirm: vi.fn(),
@@ -88,7 +88,7 @@ describe('ClassesPage', () => {
     confirmationServiceMock.confirm.mockClear();
 
     await TestBed.configureTestingModule({
-      imports: [ClassesPage],
+      imports: [CoursesPage],
       providers: [
         provideRouter([]),
         { provide: CoursesService, useValue: coursesServiceMock },
@@ -105,12 +105,12 @@ describe('ClassesPage', () => {
       ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(ClassesPage);
+    fixture = TestBed.createComponent(CoursesPage);
     component = fixture.componentInstance;
     fixture.componentRef.setInput('page', {
       label: '課程管理',
-      relativePath: 'classes',
-      absolutePath: '/admin/classes',
+      relativePath: 'courses',
+      absolutePath: '/admin/courses',
       role: undefined,
       icon: 'pi-users',
       showInMenu: true,

@@ -3,7 +3,7 @@
 
 @use 'shared/breakpoints' as bp;
 
-.classes {
+.courses {
   padding: var(--space-6);
   display: flex;
   flex-direction: column;
@@ -150,7 +150,7 @@
 // Course Groups
 // ============================================================
 
-.classes__groups {
+.courses__groups {
   display: flex;
   flex-direction: column;
 }
@@ -415,7 +415,7 @@
 // ============================================================
 
 @include bp.respond-to('tablet-portrait') {
-  .classes {
+  .courses {
     padding: var(--space-4) 0;
 
     &__toolbar {
@@ -443,12 +443,12 @@
   }
 
   :host ::ng-deep {
-    .classes__pagination .p-paginator {
+    .courses__pagination .p-paginator {
       justify-content: center;
       gap: var(--space-2);
     }
 
-    .classes__pagination .p-paginator-current {
+    .courses__pagination .p-paginator-current {
       margin-left: 0;
       font-size: var(--text-sm);
       color: var(--zinc-500);
@@ -550,7 +550,7 @@
 }
 
 :host ::ng-deep {
-  .classes__pagination .p-paginator {
+  .courses__pagination .p-paginator {
     border: none;
     background: transparent;
     padding: 0;

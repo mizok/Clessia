@@ -190,10 +190,10 @@ export const routes: Routes = [
             data: { page: RoutesCatalog.ADMIN_SETTINGS },
           },
           {
-            path: RoutesCatalog.ADMIN_CLASSES.relativePath,
+            path: RoutesCatalog.ADMIN_COURSES.relativePath,
             loadComponent: () =>
-              import('@features/admin/pages/classes/classes.page').then((m) => m.ClassesPage),
-            data: { page: RoutesCatalog.ADMIN_CLASSES },
+              import('@features/admin/pages/courses/courses.page').then((m) => m.CoursesPage),
+            data: { page: RoutesCatalog.ADMIN_COURSES },
           },
           {
             path: RoutesCatalog.ADMIN_ENROLLMENT.relativePath,
