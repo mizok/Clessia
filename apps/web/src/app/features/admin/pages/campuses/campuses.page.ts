@@ -30,6 +30,7 @@ import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { SkeletonModule } from 'primeng/skeleton';
 import { InputTextModule } from 'primeng/inputtext';
+import { PaginatorModule } from 'primeng/paginator';
 
 @Component({
   selector: 'app-campuses',
@@ -47,6 +48,7 @@ import { InputTextModule } from 'primeng/inputtext';
     TooltipModule,
     SkeletonModule,
     InputTextModule,
+    PaginatorModule,
     EmptyStateComponent,
   ],
   providers: [MessageService, ConfirmationService, DialogService],
@@ -67,18 +69,11 @@ export class CampusesPage implements OnInit {
   readonly campuses = signal<Campus[]>([]);
   readonly loading = signal(true);
   readonly searchQuery = signal('');
+  protected readonly currentPage = signal(1);
+  protected readonly total = signal(0);
+  protected readonly PAGE_SIZE = 50;
 
   // Computed
-  readonly filteredCampuses = computed(() => {
-    const query = this.searchQuery().toLowerCase().trim();
-    if (!query) return this.campuses();
-    return this.campuses().filter(
-      (c) =>
-        c.name.toLowerCase().includes(query) ||
-        c.address?.toLowerCase().includes(query) ||
-        c.phone?.includes(query),
-    );
-  });
   readonly activeCampusCount = computed(() => this.campuses().filter((c) => c.isActive).length);
   readonly inactiveCampusCount = computed(() => this.campuses().filter((c) => !c.isActive).length);
 
@@ -88,21 +83,39 @@ export class CampusesPage implements OnInit {
 
   loadCampuses(): void {
     this.loading.set(true);
-    this.campusesService.list({ pageSize: 100 }).subscribe({
-      next: (res) => {
-        this.campuses.set(res.data);
-        this.loading.set(false);
-      },
-      error: (err) => {
-        console.error('Failed to load campuses', err);
-        this.messageService.add({
-          severity: 'error',
-          summary: '載入失敗',
-          detail: '無法載入分校列表',
-        });
-        this.loading.set(false);
-      },
-    });
+    this.campusesService
+      .list({
+        search: this.searchQuery() || undefined,
+        page: this.currentPage(),
+        pageSize: this.PAGE_SIZE,
+      })
+      .subscribe({
+        next: (res) => {
+          this.campuses.set(res.data);
+          this.total.set(res.meta.total);
+          this.loading.set(false);
+        },
+        error: (err) => {
+          console.error('Failed to load campuses', err);
+          this.messageService.add({
+            severity: 'error',
+            summary: '載入失敗',
+            detail: '無法載入分校列表',
+          });
+          this.loading.set(false);
+        },
+      });
+  }
+
+  protected onSearchChange(value: string): void {
+    this.searchQuery.set(value);
+    this.currentPage.set(1);
+    this.loadCampuses();
+  }
+
+  protected onPageChange(page: number): void {
+    this.currentPage.set(page);
+    this.loadCampuses();
   }
 
   openCreateDialog(): void {

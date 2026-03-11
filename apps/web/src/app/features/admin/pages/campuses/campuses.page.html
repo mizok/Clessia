@@ -32,7 +32,7 @@
             pInputText
             placeholder="搜尋分校名稱、地址或電話..."
             [ngModel]="searchQuery()"
-            (ngModelChange)="searchQuery.set($event)"
+            (ngModelChange)="onSearchChange($event)"
           />
         </p-iconfield>
       </div>
@@ -65,7 +65,7 @@
             <span class="skeleton-bar"></span>
           }
         </div>
-      } @else if (filteredCampuses().length === 0) {
+      } @else if (campuses().length === 0) {
         <!-- Empty State -->
         @if (searchQuery()) {
           <app-empty-state
@@ -77,7 +77,7 @@
               label="清除搜尋"
               [text]="true"
               severity="secondary"
-              (onClick)="searchQuery.set('')"
+              (onClick)="onSearchChange('')"
             />
           </app-empty-state>
         } @else {
@@ -92,15 +92,7 @@
       } @else {
         <!-- Desktop: Data Table -->
         <div class="campuses__table-view">
-          <p-table
-            [value]="filteredCampuses()"
-            [paginator]="filteredCampuses().length > 10"
-            [rows]="10"
-            [rowsPerPageOptions]="[10, 20, 50]"
-            [showCurrentPageReport]="true"
-            currentPageReportTemplate="顯示 {first} - {last}，共 {totalRecords} 筆"
-            styleClass="p-datatable-sm"
-          >
+          <p-table [value]="campuses()" styleClass="p-datatable-sm">
             <ng-template #header>
               <tr>
                 <th style="width: 25%">分校名稱</th>
@@ -171,7 +163,7 @@
 
         <!-- Mobile: Card List -->
         <div class="campuses__card-view">
-          @for (campus of filteredCampuses(); track campus.id) {
+          @for (campus of campuses(); track campus.id) {
             <article class="campus-card">
               <div class="campus-card__header">
                 <div class="campus-card__icon">
@@ -228,10 +220,19 @@
           }
 
           <!-- Mobile pagination info -->
-          @if (filteredCampuses().length > 0) {
-            <div class="campuses__mobile-count">共 {{ filteredCampuses().length }} 個分校</div>
+          @if (campuses().length > 0) {
+            <div class="campuses__mobile-count">共 {{ total() }} 個分校</div>
           }
         </div>
+
+        @if (total() > PAGE_SIZE) {
+          <p-paginator
+            [rows]="PAGE_SIZE"
+            [totalRecords]="total()"
+            [first]="(currentPage() - 1) * PAGE_SIZE"
+            (onPageChange)="onPageChange(($event.page ?? 0) + 1)"
+          />
+        }
       }
     </div>
   </div>
