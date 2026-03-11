@@ -17,8 +17,17 @@ describe('SessionsPage', () => {
   let fixture: ComponentFixture<SessionsPage>;
   let router: Router;
   let routeQueryParams: Record<string, string>;
+  const makeListResponse = (data: Session[] = []) => ({
+    data,
+    meta: {
+      total: data.length,
+      page: 1,
+      pageSize: 50,
+      totalPages: Math.max(1, Math.ceil(data.length / 50)),
+    },
+  });
   const sessionsServiceMock = {
-    list: vi.fn(() => of({ data: [] })),
+    list: vi.fn(() => of(makeListResponse())),
     batchAssignTeacher: vi.fn(() =>
       of({ updated: 0, skippedConflicts: 0, skippedNotEligible: 0, conflicts: [], dryRun: true }),
     ),
@@ -285,47 +294,9 @@ describe('SessionsPage', () => {
   it('treats empty status selection as all statuses', () => {
     (
       component as unknown as {
-        sessions: { set: (value: Session[]) => void };
-        onStatusesChange: (value: string[] | null) => void;
-        selectedStatuses: () => string[];
-        filteredSessions: () => Session[];
+        listDateRange: { set: (value: Date[]) => void };
       }
-    ).sessions.set([
-      {
-        id: 'session-scheduled',
-        classId: 'class-1',
-        className: 'A班',
-        courseId: 'course-1',
-        courseName: '國文課',
-        campusId: 'campus-1',
-        campusName: '示範分校',
-        sessionDate: '2026-03-09',
-        startTime: '09:00',
-        endTime: '11:00',
-        teacherId: null,
-        teacherName: null,
-        status: 'scheduled',
-        assignmentStatus: 'unassigned',
-        hasChanges: false,
-      },
-      {
-        id: 'session-cancelled',
-        classId: 'class-1',
-        className: 'A班',
-        courseId: 'course-1',
-        courseName: '國文課',
-        campusId: 'campus-1',
-        campusName: '示範分校',
-        sessionDate: '2026-03-16',
-        startTime: '09:00',
-        endTime: '11:00',
-        teacherId: null,
-        teacherName: null,
-        status: 'cancelled',
-        assignmentStatus: 'unassigned',
-        hasChanges: false,
-      },
-    ]);
+    ).listDateRange.set([new Date('2026-03-09'), new Date('2026-03-16')]);
 
     (
       component as unknown as {
@@ -336,15 +307,17 @@ describe('SessionsPage', () => {
     const selectedStatuses = (
       component as unknown as { selectedStatuses: () => string[] }
     ).selectedStatuses();
-    const filteredSessions = (
-      component as unknown as { filteredSessions: () => Session[] }
-    ).filteredSessions();
 
     expect(selectedStatuses).toEqual([]);
-    expect(filteredSessions.map((session) => session.id)).toEqual([
-      'session-scheduled',
-      'session-cancelled',
-    ]);
+    expect(sessionsServiceMock.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        from: '2026-03-09',
+        to: '2026-03-16',
+        statuses: undefined,
+        page: 1,
+        pageSize: 50,
+      }),
+    );
   });
 
   it('keeps filters in memory without syncing query params', () => {
@@ -391,7 +364,11 @@ describe('SessionsPage', () => {
       campusIds: ['campus-1', 'campus-2'],
       courseIds: ['course-1'],
       teacherIds: ['teacher-1'],
+      assignmentStatus: 'unassigned',
       classId: undefined,
+      statuses: undefined,
+      page: 1,
+      pageSize: 50,
     });
   });
 

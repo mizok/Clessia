@@ -48,6 +48,14 @@ const SessionListQuerySchema = z
     classId: z.uuid().optional().openapi({ description: '班級 ID' }),
     page: z.coerce.number().optional().openapi({ description: '頁碼' }),
     pageSize: z.coerce.number().optional().openapi({ description: '每頁筆數' }),
+    statuses: z
+      .string()
+      .optional()
+      .openapi({ description: '課堂狀態（逗號分隔）：scheduled,completed,cancelled' }),
+    assignmentStatus: z
+      .enum(['assigned', 'unassigned'])
+      .optional()
+      .openapi({ description: '指派狀態' }),
   })
   .openapi('SessionListQuery');
 
@@ -80,6 +88,12 @@ const SessionListItemSchema = z
 const SessionListResponseSchema = z
   .object({
     data: z.array(SessionListItemSchema),
+    meta: z.object({
+      total: z.number(),
+      page: z.number(),
+      pageSize: z.number(),
+      totalPages: z.number(),
+    }),
   })
   .openapi('SessionListResponse');
 
@@ -496,7 +510,21 @@ const listSessionsRoute = createRoute({
 app.openapi(listSessionsRoute, async (c) => {
   const supabase = c.get('supabase');
   const orgId = c.get('orgId');
-  const { from, to, campusId, campusIds, courseId, courseIds, teacherId, teacherIds, classId, page, pageSize } = c.req.valid('query');
+  const {
+    from,
+    to,
+    campusId,
+    campusIds,
+    courseId,
+    courseIds,
+    teacherId,
+    teacherIds,
+    classId,
+    page,
+    pageSize,
+    statuses,
+    assignmentStatus,
+  } = c.req.valid('query');
 
   let dbQuery = supabase
     .from('sessions')
@@ -511,6 +539,7 @@ app.openapi(listSessionsRoute, async (c) => {
       ),
       staff ( display_name )
     `,
+      { count: 'exact' },
     )
     .eq('org_id', orgId)
     .order('session_date')
@@ -546,17 +575,23 @@ app.openapi(listSessionsRoute, async (c) => {
   if (classId) {
     dbQuery = dbQuery.eq('class_id', classId);
   }
-
-  // Pagination
-  if (page && pageSize) {
-    const fromOffset = (page - 1) * pageSize;
-    const toOffset = fromOffset + pageSize - 1;
-    dbQuery = dbQuery.range(fromOffset, toOffset);
-  } else if (pageSize) {
-    dbQuery = dbQuery.limit(pageSize);
+  if (statuses) {
+    const statusList = statuses
+      .split(',')
+      .filter(Boolean) as ('scheduled' | 'completed' | 'cancelled')[];
+    if (statusList.length > 0) dbQuery = dbQuery.in('status', statusList);
+  }
+  if (assignmentStatus) {
+    dbQuery = dbQuery.eq('assignment_status', assignmentStatus);
   }
 
-  const { data, error } = await dbQuery;
+  // Pagination
+  const resolvedPage = page ?? 1;
+  const resolvedPageSize = pageSize ?? 50;
+  const offset = (resolvedPage - 1) * resolvedPageSize;
+  dbQuery = dbQuery.range(offset, offset + resolvedPageSize - 1);
+
+  const { data, count, error } = await dbQuery;
   if (error) {
     return c.json({ error: error.message, code: 'DB_ERROR' }, 400);
   }
@@ -583,6 +618,12 @@ app.openapi(listSessionsRoute, async (c) => {
   return c.json(
     {
       data: rows.map((row) => mapSession(row, changedIds.has(row['id'] as string))),
+      meta: {
+        total: count ?? 0,
+        page: resolvedPage,
+        pageSize: resolvedPageSize,
+        totalPages: Math.ceil((count ?? 0) / resolvedPageSize),
+      },
     },
     200,
   );

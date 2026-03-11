@@ -39,7 +39,6 @@ import {
 } from './dialogs/mobile-batch-dialog/mobile-batch-dialog.component';
 import {
   SessionFiltersComponent,
-  ALL_SESSION_STATUSES,
   DEFAULT_STATUSES,
 } from './components/session-filters/session-filters.component';
 import { SessionsHeaderComponent } from './components/sessions-header/sessions-header.component';
@@ -102,6 +101,9 @@ export class SessionsPage implements OnInit {
   protected readonly selectedTeacherIds = signal<string[]>([]);
   protected readonly selectedClassIds = signal<string[]>([]);
   protected readonly selectedStatuses = signal<string[]>([...DEFAULT_STATUSES]);
+  protected readonly currentPage = signal(1);
+  protected readonly totalSessions = signal(0);
+  protected readonly PAGE_SIZE = 50;
 
   // ── List date range ────────────────────────────────────────────────────
   protected readonly listDateRange = signal<Date[]>(this.getDefaultListDateRange());
@@ -176,34 +178,6 @@ export class SessionsPage implements OnInit {
       this.listDateRangeModified() ||
       !this.isDefaultStatuses(),
   );
-
-  private readonly effectiveStatuses = computed(() => {
-    const statuses = this.selectedStatuses();
-    return statuses.length > 0 ? statuses : ALL_SESSION_STATUSES;
-  });
-
-  protected readonly filteredSessions = computed(() => {
-    const sessions = this.sessions();
-    const teacherIds = this.selectedTeacherIds();
-    const statuses = new Set(this.effectiveStatuses());
-    const hasUnassigned = teacherIds.includes('__unassigned__');
-    const realTeacherIds = new Set(teacherIds.filter((id) => id !== '__unassigned__'));
-
-    return sessions.filter((s) => {
-      if (!statuses.has(s.status)) return false;
-      const classIds = this.selectedClassIds();
-      if (classIds.length > 0 && !classIds.includes(s.classId)) return false;
-
-      if (hasUnassigned || realTeacherIds.size > 0) {
-        const matchesUnassigned =
-          hasUnassigned && s.assignmentStatus === 'unassigned' && s.status === 'scheduled';
-        const matchesTeacher = realTeacherIds.size > 0 && !!s.teacherId && realTeacherIds.has(s.teacherId);
-        if (!matchesUnassigned && !matchesTeacher) return false;
-      }
-
-      return true;
-    });
-  });
 
   protected readonly unassignedCount = computed(
     () =>
@@ -352,6 +326,7 @@ export class SessionsPage implements OnInit {
     });
     ref?.onClose.subscribe((result?: MobileFilterDialogResult) => {
       if (result) {
+        this.currentPage.set(1);
         this.selectedCampusIds.set(result.campusIds);
         this.selectedCourseIds.set(result.courseIds);
         this.selectedTeacherIds.set(result.teacherIds);
@@ -418,6 +393,7 @@ export class SessionsPage implements OnInit {
 
   // ── Filters ────────────────────────────────────────────────────────────
   protected onCampusIdsChange(ids: string[]): void {
+    this.currentPage.set(1);
     this.selectedCampusIds.set(ids);
     this.selectedCourseIds.set([]);
     this.selectedTeacherIds.set([]);
@@ -426,6 +402,7 @@ export class SessionsPage implements OnInit {
   }
 
   protected onCourseIdsChange(ids: string[]): void {
+    this.currentPage.set(1);
     this.selectedCourseIds.set(ids);
     this.selectedTeacherIds.set([]);
     this.selectedClassIds.set([]);
@@ -433,17 +410,20 @@ export class SessionsPage implements OnInit {
   }
 
   protected onTeacherIdsChange(ids: string[]): void {
+    this.currentPage.set(1);
     this.selectedTeacherIds.set(ids);
     this.loadSessions();
   }
 
   protected onClassChange(classIds: string[]): void {
+    this.currentPage.set(1);
     this.selectedClassIds.set(classIds);
     this.loadSessions();
   }
 
   protected onListDateRangeChange(range: Date[]): void {
     this.listDateRange.set(range);
+    this.currentPage.set(1);
     this.listDateRangeModified.set(true);
     if (range.length === 2) {
       this.loadSessions();
@@ -451,14 +431,19 @@ export class SessionsPage implements OnInit {
   }
 
   protected onStatusesChange(statuses: string[] | null): void {
+    this.currentPage.set(1);
     this.selectedStatuses.set(statuses ?? []);
+    this.loadSessions();
   }
 
   protected onFilterUnassigned(): void {
+    this.currentPage.set(1);
     this.selectedTeacherIds.set(['__unassigned__']);
+    this.loadSessions();
   }
 
   protected clearFilters(): void {
+    this.currentPage.set(1);
     this.selectedCourseIds.set([]);
     this.selectedTeacherIds.set([]);
     this.selectedClassIds.set([]);
@@ -475,6 +460,11 @@ export class SessionsPage implements OnInit {
       data: { session, loadingChanges: true, changes: [] }, styleClass: 'session-dialog',
       appendTo: this.overlayContainer ?? 'body',
     });
+  }
+
+  protected onPageChange(page: number): void {
+    this.currentPage.set(page);
+    this.loadSessions();
   }
 
   // ── Private ────────────────────────────────────────────────────────────
@@ -516,31 +506,28 @@ export class SessionsPage implements OnInit {
 
   private loadSessions(): void {
     const range = this.listDateRange();
-    const from = range.length > 0 ? format(range[0], 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
-    const to = range.length > 1 ? format(range[1], 'yyyy-MM-dd') : from;
-
     const rawIds = this.selectedTeacherIds();
     const realTeacherIds = rawIds.filter((id) => id !== '__unassigned__');
-    let teacherIds: string[] | undefined;
-    if (rawIds.includes('__unassigned__')) {
-      if (realTeacherIds.length > 0) teacherIds = realTeacherIds;
-    } else if (realTeacherIds.length > 0) {
-      teacherIds = realTeacherIds;
-    }
+    const hasUnassigned = rawIds.includes('__unassigned__');
 
     this.loading.set(true);
     this.sessionsService
       .list({
-        from,
-        to,
+        from: range.length > 0 ? format(range[0], 'yyyy-MM-dd') : undefined,
+        to: range.length > 1 ? format(range[1], 'yyyy-MM-dd') : undefined,
         campusIds: this.selectedCampusIds().length > 0 ? this.selectedCampusIds() : undefined,
         courseIds: this.selectedCourseIds().length > 0 ? this.selectedCourseIds() : undefined,
-        teacherIds,
+        teacherIds: realTeacherIds.length > 0 ? realTeacherIds : undefined,
+        assignmentStatus: hasUnassigned ? 'unassigned' : undefined,
         classId: this.selectedClassIds().length === 1 ? this.selectedClassIds()[0] : undefined,
+        statuses: this.selectedStatuses().length > 0 ? this.selectedStatuses() : undefined,
+        page: this.currentPage(),
+        pageSize: this.PAGE_SIZE,
       })
       .subscribe({
         next: (res) => {
           this.sessions.set(res.data);
+          this.totalSessions.set(res.meta.total);
           this.loading.set(false);
         },
         error: () => {

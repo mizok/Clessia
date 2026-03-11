@@ -34,12 +34,16 @@
 
   <app-sessions-body
     [loading]="loading()"
-    [sessions]="filteredSessions()"
+    [sessions]="sessions()"
     [selectedIds]="selectedIds()"
     [selectedCount]="selectedCount()"
+    [total]="totalSessions()"
+    [pageSize]="PAGE_SIZE"
+    [currentPage]="currentPage()"
     (selectedIdsChange)="onSelectedIdsChange($event)"
     (contextMenuRequested)="onSessionListContextMenu($event)"
     (clearSelection)="clearSelection()"
     (openBatchSheet)="openBatchSheet($event)"
+    (pageChange)="onPageChange($event)"
   />
 </div>

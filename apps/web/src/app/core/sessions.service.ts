@@ -47,6 +47,8 @@ export interface SessionQueryParams {
   courseIds?: string[];
   teacherIds?: string[];
   classId?: string;
+  statuses?: string[];
+  assignmentStatus?: 'assigned' | 'unassigned';
   page?: number;
   pageSize?: number;
 }
@@ -110,7 +112,10 @@ export class SessionsService {
   private readonly http = inject(HttpClient);
   private readonly endpoint = `${environment.apiUrl}/api/sessions`;
 
-  list(params: SessionQueryParams): Observable<{ data: Session[] }> {
+  list(params: SessionQueryParams): Observable<{
+    data: Session[];
+    meta: { total: number; page: number; pageSize: number; totalPages: number };
+  }> {
     const query: Record<string, string> = {};
 
     if (params.from) query['from'] = params.from;
@@ -125,10 +130,15 @@ export class SessionsService {
       query['teacherIds'] = params.teacherIds.join(',');
     }
     if (params.classId) query['classId'] = params.classId;
+    if (params.statuses && params.statuses.length > 0) query['statuses'] = params.statuses.join(',');
+    if (params.assignmentStatus) query['assignmentStatus'] = params.assignmentStatus;
     if (params.page) query['page'] = params.page.toString();
     if (params.pageSize) query['pageSize'] = params.pageSize.toString();
 
-    return this.http.get<{ data: Session[] }>(this.endpoint, { params: query });
+    return this.http.get<{
+      data: Session[];
+      meta: { total: number; page: number; pageSize: number; totalPages: number };
+    }>(this.endpoint, { params: query });
   }
 
   getChanges(sessionId: string): Observable<{ data: SessionHistoryEntry[] }> {
