@@ -1,5 +1,6 @@
 import {
   Component,
+  DestroyRef,
   OnInit,
   computed,
   inject,
@@ -8,7 +9,9 @@ import {
   viewChild,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
+import { filter } from 'rxjs';
 import { endOfMonth, format } from 'date-fns';
 import { MessageService, type MenuItem } from 'primeng/api';
 import { MenuModule, type Menu } from 'primeng/menu';
@@ -80,6 +83,8 @@ export class SessionsPage implements OnInit {
   private readonly dialogService = inject(DialogService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+  private isSyncingParams = false;
 
   protected get overlayContainer(): HTMLElement | null {
     return this.overlayContainerService.getContainer();
@@ -272,6 +277,20 @@ export class SessionsPage implements OnInit {
     this.applyQueryParams();
     this.loadFilters();
     this.loadSessions();
+
+    this.router.events
+      .pipe(
+        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+        filter(() => !this.isSyncingParams),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => {
+        const params = this.route.snapshot.queryParams;
+        const hasParams = Object.values(params).some((v) => !!v);
+        if (!hasParams) {
+          this.clearFilters();
+        }
+      });
   }
 
   // ── List actions ───────────────────────────────────────────────────────
@@ -528,11 +547,16 @@ export class SessionsPage implements OnInit {
   }
 
   private syncQueryParams(): void {
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: this.buildQueryParams(),
-      replaceUrl: true,
-    });
+    this.isSyncingParams = true;
+    this.router
+      .navigate([], {
+        relativeTo: this.route,
+        queryParams: this.buildQueryParams(),
+        replaceUrl: true,
+      })
+      .then(() => {
+        this.isSyncingParams = false;
+      });
   }
 
   private buildQueryParams(): Record<string, string | null> {
