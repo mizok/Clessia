@@ -208,6 +208,13 @@ export class SessionsPage implements OnInit {
     });
   });
 
+  protected readonly unassignedCount = computed(
+    () =>
+      this.sessions().filter(
+        (s) => s.assignmentStatus === 'unassigned' && s.status !== 'cancelled',
+      ).length,
+  );
+
   // ── Selection state ────────────────────────────────────────────────────
   protected readonly selectedIds = signal<Set<string>>(new Set());
   protected readonly selectedCount = computed(() => this.selectedIds().size);
@@ -455,6 +462,11 @@ export class SessionsPage implements OnInit {
 
   protected onStatusesChange(statuses: string[] | null): void {
     this.selectedStatuses.set(statuses ?? []);
+    this.syncQueryParams();
+  }
+
+  protected onFilterUnassigned(): void {
+    this.selectedTeacherIds.set(['__unassigned__']);
     this.syncQueryParams();
   }
 

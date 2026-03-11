@@ -3,7 +3,10 @@
 
 <div class="cal">
   <section class="cal__controls">
-    <app-sessions-header />
+    <app-sessions-header
+      [unassignedCount]="unassignedCount()"
+      (filterUnassigned)="onFilterUnassigned()"
+    />
 
     <app-session-filters
       [listDateRange]="listDateRange()"
