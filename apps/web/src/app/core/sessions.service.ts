@@ -114,7 +114,7 @@ export class SessionsService {
 
   list(params: SessionQueryParams): Observable<{
     data: Session[];
-    meta: { total: number; page: number; pageSize: number; totalPages: number };
+    meta: { total: number; page: number; pageSize: number; totalPages: number; unassignedCount: number };
   }> {
     const query: Record<string, string> = {};
 
@@ -137,7 +137,7 @@ export class SessionsService {
 
     return this.http.get<{
       data: Session[];
-      meta: { total: number; page: number; pageSize: number; totalPages: number };
+      meta: { total: number; page: number; pageSize: number; totalPages: number; unassignedCount: number };
     }>(this.endpoint, { params: query });
   }
 

@@ -93,6 +93,7 @@ const SessionListResponseSchema = z
       page: z.number(),
       pageSize: z.number(),
       totalPages: z.number(),
+      unassignedCount: z.number(),
     }),
   })
   .openapi('SessionListResponse');
@@ -596,6 +597,30 @@ app.openapi(listSessionsRoute, async (c) => {
     return c.json({ error: error.message, code: 'DB_ERROR' }, 400);
   }
 
+  // Unassigned count — uses same context filters (date/campus/course/class) but always unassigned+scheduled
+  let unassignedCountQuery = supabase
+    .from('sessions')
+    .select('id', { count: 'exact', head: true })
+    .eq('org_id', orgId)
+    .eq('assignment_status', 'unassigned')
+    .eq('status', 'scheduled');
+  if (from) unassignedCountQuery = unassignedCountQuery.gte('session_date', from);
+  if (to) unassignedCountQuery = unassignedCountQuery.lte('session_date', to);
+  if (campusIds) {
+    const ids = campusIds.split(',').filter(Boolean);
+    if (ids.length > 0) unassignedCountQuery = unassignedCountQuery.in('classes.campus_id', ids);
+  } else if (campusId) {
+    unassignedCountQuery = unassignedCountQuery.eq('classes.campus_id', campusId);
+  }
+  if (courseIds) {
+    const ids = courseIds.split(',').filter(Boolean);
+    if (ids.length > 0) unassignedCountQuery = unassignedCountQuery.in('classes.course_id', ids);
+  } else if (courseId) {
+    unassignedCountQuery = unassignedCountQuery.eq('classes.course_id', courseId);
+  }
+  if (classId) unassignedCountQuery = unassignedCountQuery.eq('class_id', classId);
+  const { count: unassignedCount } = await unassignedCountQuery;
+
   const rows = (data ?? []) as Record<string, unknown>[];
   const sessionIds = rows.map((row) => row['id'] as string);
 
@@ -623,6 +648,7 @@ app.openapi(listSessionsRoute, async (c) => {
         page: resolvedPage,
         pageSize: resolvedPageSize,
         totalPages: Math.ceil((count ?? 0) / resolvedPageSize),
+        unassignedCount: unassignedCount ?? 0,
       },
     },
     200,
