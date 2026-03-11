@@ -8,7 +8,7 @@ import {
   viewChild,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import { endOfMonth, format } from 'date-fns';
+import { format } from 'date-fns';
 import { MessageService, type MenuItem } from 'primeng/api';
 import { MenuModule, type Menu } from 'primeng/menu';
 import { ToastModule } from 'primeng/toast';
@@ -106,7 +106,7 @@ export class SessionsPage implements OnInit {
   protected readonly PAGE_SIZE = 50;
 
   // ── List date range ────────────────────────────────────────────────────
-  protected readonly listDateRange = signal<Date[]>(this.getDefaultListDateRange());
+  protected readonly listDateRange = signal<Date[]>([]);
   protected readonly listDateRangeModified = signal(false);
 
   // ── Computed ───────────────────────────────────────────────────────────
@@ -447,7 +447,7 @@ export class SessionsPage implements OnInit {
     this.selectedCourseIds.set([]);
     this.selectedTeacherIds.set([]);
     this.selectedClassIds.set([]);
-    this.listDateRange.set(this.getDefaultListDateRange());
+    this.listDateRange.set([]);
     this.listDateRangeModified.set(false);
     this.selectedStatuses.set([...DEFAULT_STATUSES]);
     this.loadSessions();
@@ -474,10 +474,6 @@ export class SessionsPage implements OnInit {
     return current === def;
   }
 
-  private getDefaultListDateRange(): Date[] {
-    const now = new Date();
-    return [now, endOfMonth(now)];
-  }
 
   private getEligibleTeachersForSession(session: Session): Staff[] {
     const campusTeachers = this.activeTeachers().filter((t) => t.campusIds.includes(session.campusId));

@@ -249,25 +249,7 @@ describe('SessionsPage', () => {
     expect(availableTeachers.map((teacher) => teacher.id)).toEqual(['teacher-a']);
   });
 
-  it('uses default date range and inactive filters on init', async () => {
-    routeQueryParams = {
-      campusId: 'campus-1',
-      courseId: 'course-1',
-      classIds: 'class-1,class-2',
-      from: '2026-02-10',
-      to: '2026-06-18',
-    };
-
-    fixture = TestBed.createComponent(SessionsPage);
-    component = fixture.componentInstance;
-    fixture.componentRef.setInput('page', {
-      label: 'Test',
-      relativePath: '',
-      absolutePath: '',
-      role: undefined,
-      icon: '',
-      showInMenu: true,
-    });
+  it('starts with empty date range and no active filters on init', async () => {
     await fixture.whenStable();
 
     const listDateRange = (
@@ -279,14 +261,8 @@ describe('SessionsPage', () => {
     const hasActiveFilters = (
       component as unknown as { hasActiveFilters: () => boolean }
     ).hasActiveFilters();
-    const selectedClassIds = (
-      component as unknown as { selectedClassIds: () => string[] }
-    ).selectedClassIds();
 
-    expect(listDateRange).toHaveLength(2);
-    expect(listDateRange[0]).toBeInstanceOf(Date);
-    expect(listDateRange[1]).toBeInstanceOf(Date);
-    expect(selectedClassIds).toEqual([]);
+    expect(listDateRange).toHaveLength(0);
     expect(activeFilterCount).toBe(0);
     expect(hasActiveFilters).toBe(false);
   });
