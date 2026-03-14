@@ -430,7 +430,9 @@ app.openapi(updateRoute, async (c) => {
       .filter((classId): classId is string => !!classId);
 
     if (classIds.length > 0) {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Asia/Taipei',
+      }).format(new Date());
 
       // 查出要取消的課堂 IDs
       const { data: targetSessions, error: fetchError } = await supabase
