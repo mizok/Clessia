@@ -95,6 +95,7 @@ const SessionListResponseSchema = z
       pageSize: z.number(),
       totalPages: z.number(),
       unassignedCount: z.number(),
+      filteredUnassignedCount: z.number(),
     }),
   })
   .openapi('SessionListResponse');
@@ -636,6 +637,49 @@ app.openapi(listSessionsRoute, async (c) => {
     .eq('assignment_status', 'unassigned')
     .eq('status', 'scheduled');
 
+  // Filtered unassigned count — 套用所有現行篩選條件（不含 pagination）
+  let filteredUnassignedQuery = supabase
+    .from('sessions')
+    .select(
+      `id, classes!inner ( name, courses!inner ( id, name ), campuses!inner ( id, name ) )`,
+      { count: 'exact', head: true },
+    )
+    .eq('org_id', orgId)
+    .eq('assignment_status', 'unassigned')
+    .eq('status', 'scheduled');
+
+  if (from) filteredUnassignedQuery = filteredUnassignedQuery.gte('session_date', from);
+  if (to) filteredUnassignedQuery = filteredUnassignedQuery.lte('session_date', to);
+
+  if (campusIds) {
+    const ids = campusIds.split(',').filter(Boolean);
+    if (ids.length > 0)
+      filteredUnassignedQuery = filteredUnassignedQuery.in('classes.campus_id', ids);
+  } else if (campusId) {
+    filteredUnassignedQuery = filteredUnassignedQuery.eq('classes.campus_id', campusId);
+  }
+  if (courseIds) {
+    const ids = courseIds.split(',').filter(Boolean);
+    if (ids.length > 0)
+      filteredUnassignedQuery = filteredUnassignedQuery.in('classes.course_id', ids);
+  } else if (courseId) {
+    filteredUnassignedQuery = filteredUnassignedQuery.eq('classes.course_id', courseId);
+  }
+  if (teacherIds) {
+    const ids = teacherIds.split(',').filter(Boolean);
+    if (ids.length > 0) filteredUnassignedQuery = filteredUnassignedQuery.in('teacher_id', ids);
+  } else if (teacherId) {
+    filteredUnassignedQuery = filteredUnassignedQuery.eq('teacher_id', teacherId);
+  }
+  if (classIds) {
+    const ids = classIds.split(',').filter(Boolean);
+    if (ids.length > 0) filteredUnassignedQuery = filteredUnassignedQuery.in('class_id', ids);
+  } else if (classId) {
+    filteredUnassignedQuery = filteredUnassignedQuery.eq('class_id', classId);
+  }
+
+  const { count: filteredUnassignedCount } = await filteredUnassignedQuery;
+
   const rows = (data ?? []) as Record<string, unknown>[];
   const sessionIds = rows.map((row) => row['id'] as string);
 
@@ -664,6 +708,7 @@ app.openapi(listSessionsRoute, async (c) => {
         pageSize: resolvedPageSize,
         totalPages: Math.ceil((count ?? 0) / resolvedPageSize),
         unassignedCount: unassignedCount ?? 0,
+        filteredUnassignedCount: filteredUnassignedCount ?? 0,
       },
     },
     200,
