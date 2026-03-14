@@ -119,6 +119,14 @@ const listRoute = createRoute({
         },
       },
     },
+    400: {
+      description: '資料庫錯誤',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+    },
   },
 });
 
@@ -158,7 +166,7 @@ app.openapi(listRoute, async (c) => {
   const { data, count, error } = await dbQuery;
 
   if (error) {
-    console.error('DB Error:', error);
+    return c.json({ error: error.message, code: 'DB_ERROR' }, 400);
   }
 
   const courses = (data || []).map((row) => mapCourse(row as Record<string, unknown>));
