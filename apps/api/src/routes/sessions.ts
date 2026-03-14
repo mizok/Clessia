@@ -32,7 +32,7 @@ const SessionAssignmentStatusSchema = z
   .openapi('SessionAssignmentStatus');
 
 const SessionHistoryTypeSchema = z
-  .enum(['creation', 'reschedule', 'substitute', 'cancellation', 'uncancel'])
+  .enum(['creation', 'reschedule', 'substitute', 'cancellation', 'uncancel', 'time_change'])
   .openapi('SessionHistoryType');
 
 const SessionListQuerySchema = z
@@ -302,7 +302,7 @@ interface BatchSessionChangeState extends SessionOperationState {
 interface BatchSessionChangeInsertInput {
   readonly orgId: string;
   readonly createdByName: string | null;
-  readonly changeType: 'cancellation' | 'reschedule' | 'uncancel';
+  readonly changeType: 'cancellation' | 'reschedule' | 'uncancel' | 'time_change';
   readonly sessionStates: readonly BatchSessionChangeState[];
   readonly reason?: string | null;
   readonly newStartTime?: string | null;
@@ -468,12 +468,28 @@ export function buildBatchSessionChangeInserts(input: BatchSessionChangeInsertIn
     org_id: input.orgId,
     session_id: sessionState.sessionId,
     change_type: input.changeType,
-    original_session_date: input.changeType === 'reschedule' ? sessionState.sessionDate : null,
-    original_start_time: input.changeType === 'reschedule' ? sessionState.startTime : null,
-    original_end_time: input.changeType === 'reschedule' ? sessionState.endTime : null,
+    original_session_date:
+      input.changeType === 'reschedule' || input.changeType === 'time_change'
+        ? sessionState.sessionDate
+        : null,
+    original_start_time:
+      input.changeType === 'reschedule' || input.changeType === 'time_change'
+        ? sessionState.startTime
+        : null,
+    original_end_time:
+      input.changeType === 'reschedule' || input.changeType === 'time_change'
+        ? sessionState.endTime
+        : null,
     new_session_date: input.changeType === 'reschedule' ? sessionState.sessionDate : null,
-    new_start_time: input.changeType === 'reschedule' ? (input.newStartTime ?? null) : null,
-    new_end_time: input.changeType === 'reschedule' ? (input.newEndTime ?? null) : null,
+    // time_change 只改時間，日期不變，所以 new_session_date = null
+    new_start_time:
+      input.changeType === 'reschedule' || input.changeType === 'time_change'
+        ? (input.newStartTime ?? null)
+        : null,
+    new_end_time:
+      input.changeType === 'reschedule' || input.changeType === 'time_change'
+        ? (input.newEndTime ?? null)
+        : null,
     original_teacher_id: null,
     original_teacher_name: null,
     substitute_teacher_id: null,
@@ -1858,7 +1874,7 @@ app.openapi(batchUpdateTimeRoute, async (c) => {
     const changes = buildBatchSessionChangeInserts({
       orgId,
       createdByName: profile?.display_name ?? null,
-      changeType: 'reschedule',
+      changeType: 'time_change',
       sessionStates: targetSessions
         .filter((session) => processableIds.includes(session.id))
         .map((session) => ({
