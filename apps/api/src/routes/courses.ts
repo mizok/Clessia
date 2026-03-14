@@ -402,17 +402,6 @@ app.openapi(updateRoute, async (c) => {
     (existingCourse['is_active'] as boolean) &&
     body.deactivateMode === 'cancel_future_sessions';
 
-  const { data, error } = await supabase
-    .from('courses')
-    .update(updateData)
-    .eq('id', id)
-    .select('*, campuses(name), subjects(name)')
-    .single();
-
-  if (error || !data) {
-    return c.json({ error: '課程不存在', code: 'NOT_FOUND' }, 404);
-  }
-
   let cancelledFutureSessions = 0;
   if (shouldCancelFutureSessions) {
     const { data: classRows, error: classRowsError } = await supabase
@@ -481,12 +470,28 @@ app.openapi(updateRoute, async (c) => {
           .insert(changeRecords);
 
         if (insertError) {
+          // Rollback sessions
+          await supabase
+            .from('sessions')
+            .update({ status: 'scheduled' })
+            .in('id', sessionIds);
           return c.json({ error: insertError.message, code: 'DB_ERROR' }, 400);
         }
 
         cancelledFutureSessions = sessionIds.length;
       }
     }
+  }
+
+  const { data, error } = await supabase
+    .from('courses')
+    .update(updateData)
+    .eq('id', id)
+    .select('*, campuses(name), subjects(name)')
+    .single();
+
+  if (error || !data) {
+    return c.json({ error: '課程不存在', code: 'NOT_FOUND' }, 404);
   }
 
   logAudit(supabase, {
