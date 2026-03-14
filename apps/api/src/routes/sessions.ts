@@ -2340,14 +2340,67 @@ app.openapi(batchUncancelRoute, async (c) => {
   const skipped = conflicts.length + missingCount;
 
   if (!dryRun && updated > 0) {
-    const { error: reopenError } = await supabase
-      .from('sessions')
-      .update({ status: 'scheduled' })
-      .eq('org_id', orgId)
-      .in('id', processableIds);
+    // 驗證老師狀態：收集 processableIds 對應課堂中有 teacher_id 的老師
+    const processableSessions = targetSessions.filter((s) => processableIds.includes(s.id));
+    const teacherIdsToCheck = [
+      ...new Set(
+        processableSessions
+          .map((s) => s.teacher_id)
+          .filter((id): id is string => !!id),
+      ),
+    ];
 
-    if (reopenError) {
-      return c.json({ error: reopenError.message, code: 'DB_ERROR' }, 400);
+    // 批次查詢老師 is_active 狀態（若無老師則跳過）
+    const activeTeacherIds = new Set<string>();
+    if (teacherIdsToCheck.length > 0) {
+      const { data: staffRows, error: staffError } = await supabase
+        .from('staff')
+        .select('id, is_active')
+        .in('id', teacherIdsToCheck);
+
+      if (staffError) {
+        return c.json({ error: staffError.message, code: 'DB_ERROR' }, 400);
+      }
+
+      for (const staff of staffRows ?? []) {
+        if ((staff as { id: string; is_active: boolean }).is_active) {
+          activeTeacherIds.add((staff as { id: string; is_active: boolean }).id);
+        }
+      }
+    }
+
+    // 分兩批：老師有效 vs 老師無效（已封存）
+    const validTeacherSessionIds = processableSessions
+      .filter((s) => !s.teacher_id || activeTeacherIds.has(s.teacher_id))
+      .map((s) => s.id);
+    const invalidTeacherSessionIds = processableSessions
+      .filter((s) => s.teacher_id && !activeTeacherIds.has(s.teacher_id))
+      .map((s) => s.id);
+
+    // 老師有效的課堂：恢復並保留 teacher_id
+    if (validTeacherSessionIds.length > 0) {
+      const { error: reopenError } = await supabase
+        .from('sessions')
+        .update({ status: 'scheduled' })
+        .eq('org_id', orgId)
+        .in('id', validTeacherSessionIds);
+
+      if (reopenError) {
+        return c.json({ error: reopenError.message, code: 'DB_ERROR' }, 400);
+      }
+    }
+
+    // 老師已封存的課堂：恢復但清空 teacher_id，設為 unassigned
+    if (invalidTeacherSessionIds.length > 0) {
+      const { error: reopenUnassignedError } = await supabase
+        .from('sessions')
+        .update({ status: 'scheduled', assignment_status: 'unassigned', teacher_id: null })
+        .eq('org_id', orgId)
+        .in('id', invalidTeacherSessionIds);
+
+      if (reopenUnassignedError) {
+        return c.json({ error: reopenUnassignedError.message, code: 'DB_ERROR' }, 400);
+      }
     }
 
     const { data: profile } = await supabase
