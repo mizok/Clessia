@@ -33,13 +33,13 @@ export interface SessionOperationState {
 }
 
 export function assertSessionOperable(session: SessionOperationState): void {
-  if (session.assignmentStatus === 'unassigned') {
-    throw new SessionUnassignedError();
-  }
   if (session.status === 'cancelled') {
     throw new SessionCancelledError();
   }
   if (session.status === 'completed') {
     throw new SessionCompletedError();
+  }
+  if (session.assignmentStatus === 'unassigned') {
+    throw new SessionUnassignedError();
   }
 }
