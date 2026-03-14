@@ -1178,6 +1178,21 @@ app.openapi(rescheduleSessionRoute, async (c) => {
   const newStartTime = normalizeTime(body.newStartTime);
   const newEndTime = normalizeTime(body.newEndTime);
 
+  // 驗證是否有實際變更
+  const normalizedCurrentStart = normalizeTime(sessionState.startTime);
+  const normalizedCurrentEnd = normalizeTime(sessionState.endTime);
+
+  if (
+    body.newSessionDate === sessionState.sessionDate &&
+    newStartTime === normalizedCurrentStart &&
+    newEndTime === normalizedCurrentEnd
+  ) {
+    return c.json(
+      { error: '調課日期與時間與現有課堂相同，無需調整', code: 'NO_CHANGE' },
+      400,
+    );
+  }
+
   if (toMinutes(newStartTime) >= toMinutes(newEndTime)) {
     return c.json({ error: '開始時間需早於結束時間', code: 'INVALID_TIME_RANGE' }, 400);
   }
