@@ -12,6 +12,7 @@ import classesRoute from './routes/classes';
 import auditLogsRoute from './routes/audit-logs';
 import sessionsRoute from './routes/sessions';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { resolveCorsOrigin } from './utils/web-origin';
 
 // ============================================================
 // Types
@@ -59,7 +60,7 @@ app.use('*', logger());
 app.use(
   '*',
   cors({
-    origin: ['http://localhost:4200', 'https://clessia.pages.dev'],
+    origin: (origin) => resolveCorsOrigin(origin),
     credentials: true,
   })
 );

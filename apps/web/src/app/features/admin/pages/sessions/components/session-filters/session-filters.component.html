@@ -39,6 +39,7 @@
     @if (campuses().length > 1) {
       <p-multiselect
         class="session-filters__control"
+        panelStyleClass="session-filters-panel"
         [options]="filteredCampusOptions()"
         optionLabel="name"
         optionValue="id"
@@ -62,6 +63,7 @@
     @if (selectedCampusIds().length > 0 && availableCourses().length > 0) {
       <p-multiselect
         class="session-filters__control"
+        panelStyleClass="session-filters-panel"
         [options]="filteredCourseOptions()"
         optionLabel="name"
         optionValue="id"
@@ -92,6 +94,7 @@
     }
     <p-multiselect
       class="session-filters__control"
+      panelStyleClass="session-filters-panel"
       [options]="teacherOptionGroups()"
       [group]="true"
       optionGroupLabel="label"
@@ -102,8 +105,6 @@
       selectedItemsLabel="{0} 位老師"
       [appendTo]="'body'"
       [filter]="false"
-      [virtualScroll]="true"
-      [virtualScrollItemSize]="54"
       [ngModel]="selectedTeacherIds()"
       (ngModelChange)="onTeacherMultiChange($event)"
     >
@@ -128,6 +129,7 @@
     @if (selectedCampusIds().length > 0 && selectedCourseIds().length > 0 && availableClasses().length > 0) {
       <p-multiselect
         class="session-filters__control"
+        panelStyleClass="session-filters-panel"
         [options]="filteredClassOptions()"
         optionLabel="name"
         optionValue="id"

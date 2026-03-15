@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { betterAuth } from 'better-auth';
 import { admin as adminPlugin, username } from 'better-auth/plugins';
 import type { Bindings } from './index';
+import { resolveTrustedOrigins } from './utils/web-origin';
 
 type AuthBindings = Pick<Bindings, 'DATABASE_URL' | 'BETTER_AUTH_SECRET' | 'BETTER_AUTH_URL'>;
 
@@ -13,7 +14,7 @@ export function createAuth(env: AuthBindings) {
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     basePath: '/api/auth',
-    trustedOrigins: ['http://localhost:4200', 'https://clessia.pages.dev'],
+    trustedOrigins: (request) => resolveTrustedOrigins(request),
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: false,
