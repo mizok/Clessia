@@ -39,36 +39,47 @@
     @if (campuses().length > 1) {
       <p-multiselect
         class="session-filters__control"
-        [options]="campuses()"
+        [options]="filteredCampusOptions()"
         optionLabel="name"
         optionValue="id"
         placeholder="所有分校"
         selectedItemsLabel="{0} 個分校"
         [appendTo]="'body'"
-        [filter]="true"
-        filterBy="name"
+        [filter]="false"
         [virtualScroll]="true"
         [virtualScrollItemSize]="38"
         [ngModel]="selectedCampusIds()"
         (ngModelChange)="onCampusMultiChange($event)"
-      />
+      >
+        <ng-template #filter>
+          <app-ime-filter-input
+            placeholder="搜尋分校..."
+            (filterChange)="campusFilterQuery.set($event)"
+          />
+        </ng-template>
+      </p-multiselect>
     }
     @if (selectedCampusIds().length > 0 && availableCourses().length > 0) {
       <p-multiselect
         class="session-filters__control"
-        [options]="availableCourses()"
+        [options]="filteredCourseOptions()"
         optionLabel="name"
         optionValue="id"
         placeholder="所有課程"
         selectedItemsLabel="{0} 個課程"
         [appendTo]="'body'"
-        [filter]="true"
-        filterBy="name,campusName"
+        [filter]="false"
         [virtualScroll]="true"
         [virtualScrollItemSize]="38"
         [ngModel]="selectedCourseIds()"
         (ngModelChange)="onCourseMultiChange($event)"
       >
+        <ng-template #filter>
+          <app-ime-filter-input
+            placeholder="搜尋課程..."
+            (filterChange)="courseFilterQuery.set($event)"
+          />
+        </ng-template>
         <ng-template #item let-course>
           <div class="session-filters__course-option">
             <span class="session-filters__course-option-name">{{ course.name }}</span>
@@ -90,19 +101,26 @@
       placeholder="所有老師"
       selectedItemsLabel="{0} 位老師"
       [appendTo]="'body'"
-      [filter]="true"
-      filterBy="displayName,subjectNames"
-      filterPlaceholder="搜尋老師..."
+      [filter]="false"
       [virtualScroll]="true"
-      [virtualScrollItemSize]="38"
+      [virtualScrollItemSize]="54"
       [ngModel]="selectedTeacherIds()"
       (ngModelChange)="onTeacherMultiChange($event)"
     >
+      <ng-template #filter>
+        <app-ime-filter-input
+          placeholder="搜尋老師..."
+          (filterChange)="teacherFilterQuery.set($event)"
+        />
+      </ng-template>
       <ng-template #item let-teacher>
         <div class="session-filters__teacher-option">
           <span class="session-filters__teacher-option-name">{{ teacher.displayName }}</span>
           @if (getTeacherSubjectLabel(teacher); as subjectLabel) {
             <span class="session-filters__teacher-option-subjects">{{ subjectLabel }}</span>
+          }
+          @if (getTeacherCampusLabel(teacher); as campusLabel) {
+            <span class="session-filters__teacher-option-campuses">{{ campusLabel }}</span>
           }
         </div>
       </ng-template>
@@ -110,19 +128,24 @@
     @if (selectedCampusIds().length > 0 && selectedCourseIds().length > 0 && availableClasses().length > 0) {
       <p-multiselect
         class="session-filters__control"
-        [options]="classDisplayOptions()"
+        [options]="filteredClassOptions()"
         optionLabel="name"
         optionValue="id"
         placeholder="所有班級"
         selectedItemsLabel="{0} 個班級"
         [appendTo]="'body'"
-        [filter]="true"
-        filterBy="name,courseName,campusName"
+        [filter]="false"
         [virtualScroll]="true"
         [virtualScrollItemSize]="38"
         [ngModel]="selectedClassIds()"
         (ngModelChange)="onClassMultiChange($event)"
       >
+        <ng-template #filter>
+          <app-ime-filter-input
+            placeholder="搜尋班級..."
+            (filterChange)="classFilterQuery.set($event)"
+          />
+        </ng-template>
         <ng-template #item let-classOption>
           <div class="session-filters__class-option">
             <span class="session-filters__class-option-name">{{ classOption.name }}</span>

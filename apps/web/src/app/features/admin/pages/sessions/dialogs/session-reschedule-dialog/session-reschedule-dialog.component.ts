@@ -6,7 +6,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { DatePickerModule } from 'primeng/datepicker';
 import { DynamicDialogConfig, DynamicDialogRef } from 'primeng/dynamicdialog';
 import { Session, SessionsService } from '@core/sessions.service';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 
 @Component({
   selector: 'app-session-reschedule-dialog',
@@ -57,7 +57,13 @@ export class SessionRescheduleDialogComponent implements OnInit {
 
   ngOnInit() {
     if (this.config.data?.session) {
-      this.session.set(this.config.data.session);
+      const s = this.config.data.session as Session;
+      this.session.set(s);
+
+      const sessionDate = parse(s.sessionDate, 'yyyy-MM-dd', new Date());
+      const startTime = parse(s.startTime.substring(0, 5), 'HH:mm', new Date());
+      const endTime = parse(s.endTime.substring(0, 5), 'HH:mm', new Date());
+      this.form.patchValue({ newSessionDate: sessionDate, newStartTime: startTime, newEndTime: endTime });
     }
 
     this.form.get('newSessionDate')!.valueChanges

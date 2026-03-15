@@ -1,0 +1,13 @@
+<p-iconfield class="ime-filter-input">
+  <input
+    pInputText
+    type="text"
+    class="ime-filter-input__input"
+    [placeholder]="placeholder()"
+    (input)="onInput($event)"
+    (compositionend)="onCompositionEnd($event)"
+  />
+  <p-inputicon>
+    <i class="pi pi-search"></i>
+  </p-inputicon>
+</p-iconfield>
