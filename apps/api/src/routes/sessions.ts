@@ -32,7 +32,7 @@ const SessionAssignmentStatusSchema = z
   .openapi('SessionAssignmentStatus');
 
 const SessionHistoryTypeSchema = z
-  .enum(['creation', 'reschedule', 'substitute', 'cancellation', 'uncancel'])
+  .enum(['creation', 'reschedule', 'substitute', 'cancellation', 'uncancel', 'time_change'])
   .openapi('SessionHistoryType');
 
 const SessionListQuerySchema = z
@@ -95,6 +95,7 @@ const SessionListResponseSchema = z
       pageSize: z.number(),
       totalPages: z.number(),
       unassignedCount: z.number(),
+      filteredUnassignedCount: z.number(),
     }),
   })
   .openapi('SessionListResponse');
@@ -302,7 +303,7 @@ interface BatchSessionChangeState extends SessionOperationState {
 interface BatchSessionChangeInsertInput {
   readonly orgId: string;
   readonly createdByName: string | null;
-  readonly changeType: 'cancellation' | 'reschedule' | 'uncancel';
+  readonly changeType: 'cancellation' | 'reschedule' | 'uncancel' | 'time_change';
   readonly sessionStates: readonly BatchSessionChangeState[];
   readonly reason?: string | null;
   readonly newStartTime?: string | null;
@@ -468,12 +469,28 @@ export function buildBatchSessionChangeInserts(input: BatchSessionChangeInsertIn
     org_id: input.orgId,
     session_id: sessionState.sessionId,
     change_type: input.changeType,
-    original_session_date: input.changeType === 'reschedule' ? sessionState.sessionDate : null,
-    original_start_time: input.changeType === 'reschedule' ? sessionState.startTime : null,
-    original_end_time: input.changeType === 'reschedule' ? sessionState.endTime : null,
+    original_session_date:
+      input.changeType === 'reschedule' || input.changeType === 'time_change'
+        ? sessionState.sessionDate
+        : null,
+    original_start_time:
+      input.changeType === 'reschedule' || input.changeType === 'time_change'
+        ? sessionState.startTime
+        : null,
+    original_end_time:
+      input.changeType === 'reschedule' || input.changeType === 'time_change'
+        ? sessionState.endTime
+        : null,
     new_session_date: input.changeType === 'reschedule' ? sessionState.sessionDate : null,
-    new_start_time: input.changeType === 'reschedule' ? (input.newStartTime ?? null) : null,
-    new_end_time: input.changeType === 'reschedule' ? (input.newEndTime ?? null) : null,
+    // time_change 只改時間，日期不變，所以 new_session_date = null
+    new_start_time:
+      input.changeType === 'reschedule' || input.changeType === 'time_change'
+        ? (input.newStartTime ?? null)
+        : null,
+    new_end_time:
+      input.changeType === 'reschedule' || input.changeType === 'time_change'
+        ? (input.newEndTime ?? null)
+        : null,
     original_teacher_id: null,
     original_teacher_name: null,
     substitute_teacher_id: null,
@@ -620,6 +637,49 @@ app.openapi(listSessionsRoute, async (c) => {
     .eq('assignment_status', 'unassigned')
     .eq('status', 'scheduled');
 
+  // Filtered unassigned count — 套用所有現行篩選條件（不含 pagination）
+  let filteredUnassignedQuery = supabase
+    .from('sessions')
+    .select(
+      `id, classes!inner ( name, courses!inner ( id, name ), campuses!inner ( id, name ) )`,
+      { count: 'exact', head: true },
+    )
+    .eq('org_id', orgId)
+    .eq('assignment_status', 'unassigned')
+    .eq('status', 'scheduled');
+
+  if (from) filteredUnassignedQuery = filteredUnassignedQuery.gte('session_date', from);
+  if (to) filteredUnassignedQuery = filteredUnassignedQuery.lte('session_date', to);
+
+  if (campusIds) {
+    const ids = campusIds.split(',').filter(Boolean);
+    if (ids.length > 0)
+      filteredUnassignedQuery = filteredUnassignedQuery.in('classes.campus_id', ids);
+  } else if (campusId) {
+    filteredUnassignedQuery = filteredUnassignedQuery.eq('classes.campus_id', campusId);
+  }
+  if (courseIds) {
+    const ids = courseIds.split(',').filter(Boolean);
+    if (ids.length > 0)
+      filteredUnassignedQuery = filteredUnassignedQuery.in('classes.course_id', ids);
+  } else if (courseId) {
+    filteredUnassignedQuery = filteredUnassignedQuery.eq('classes.course_id', courseId);
+  }
+  if (teacherIds) {
+    const ids = teacherIds.split(',').filter(Boolean);
+    if (ids.length > 0) filteredUnassignedQuery = filteredUnassignedQuery.in('teacher_id', ids);
+  } else if (teacherId) {
+    filteredUnassignedQuery = filteredUnassignedQuery.eq('teacher_id', teacherId);
+  }
+  if (classIds) {
+    const ids = classIds.split(',').filter(Boolean);
+    if (ids.length > 0) filteredUnassignedQuery = filteredUnassignedQuery.in('class_id', ids);
+  } else if (classId) {
+    filteredUnassignedQuery = filteredUnassignedQuery.eq('class_id', classId);
+  }
+
+  const { count: filteredUnassignedCount } = await filteredUnassignedQuery;
+
   const rows = (data ?? []) as Record<string, unknown>[];
   const sessionIds = rows.map((row) => row['id'] as string);
 
@@ -648,6 +708,7 @@ app.openapi(listSessionsRoute, async (c) => {
         pageSize: resolvedPageSize,
         totalPages: Math.ceil((count ?? 0) / resolvedPageSize),
         unassignedCount: unassignedCount ?? 0,
+        filteredUnassignedCount: filteredUnassignedCount ?? 0,
       },
     },
     200,
@@ -1177,6 +1238,21 @@ app.openapi(rescheduleSessionRoute, async (c) => {
 
   const newStartTime = normalizeTime(body.newStartTime);
   const newEndTime = normalizeTime(body.newEndTime);
+
+  // 驗證是否有實際變更
+  const normalizedCurrentStart = normalizeTime(sessionState.startTime);
+  const normalizedCurrentEnd = normalizeTime(sessionState.endTime);
+
+  if (
+    body.newSessionDate === sessionState.sessionDate &&
+    newStartTime === normalizedCurrentStart &&
+    newEndTime === normalizedCurrentEnd
+  ) {
+    return c.json(
+      { error: '調課日期與時間與現有課堂相同，無需調整', code: 'NO_CHANGE' },
+      400,
+    );
+  }
 
   if (toMinutes(newStartTime) >= toMinutes(newEndTime)) {
     return c.json({ error: '開始時間需早於結束時間', code: 'INVALID_TIME_RANGE' }, 400);
@@ -1843,7 +1919,7 @@ app.openapi(batchUpdateTimeRoute, async (c) => {
     const changes = buildBatchSessionChangeInserts({
       orgId,
       createdByName: profile?.display_name ?? null,
-      changeType: 'reschedule',
+      changeType: 'time_change',
       sessionStates: targetSessions
         .filter((session) => processableIds.includes(session.id))
         .map((session) => ({
@@ -2325,14 +2401,67 @@ app.openapi(batchUncancelRoute, async (c) => {
   const skipped = conflicts.length + missingCount;
 
   if (!dryRun && updated > 0) {
-    const { error: reopenError } = await supabase
-      .from('sessions')
-      .update({ status: 'scheduled' })
-      .eq('org_id', orgId)
-      .in('id', processableIds);
+    // 驗證老師狀態：收集 processableIds 對應課堂中有 teacher_id 的老師
+    const processableSessions = targetSessions.filter((s) => processableIds.includes(s.id));
+    const teacherIdsToCheck = [
+      ...new Set(
+        processableSessions
+          .map((s) => s.teacher_id)
+          .filter((id): id is string => !!id),
+      ),
+    ];
 
-    if (reopenError) {
-      return c.json({ error: reopenError.message, code: 'DB_ERROR' }, 400);
+    // 批次查詢老師 is_active 狀態（若無老師則跳過）
+    const activeTeacherIds = new Set<string>();
+    if (teacherIdsToCheck.length > 0) {
+      const { data: staffRows, error: staffError } = await supabase
+        .from('staff')
+        .select('id, is_active')
+        .in('id', teacherIdsToCheck);
+
+      if (staffError) {
+        return c.json({ error: staffError.message, code: 'DB_ERROR' }, 400);
+      }
+
+      for (const staff of staffRows ?? []) {
+        if ((staff as { id: string; is_active: boolean }).is_active) {
+          activeTeacherIds.add((staff as { id: string; is_active: boolean }).id);
+        }
+      }
+    }
+
+    // 分兩批：老師有效 vs 老師無效（已封存）
+    const validTeacherSessionIds = processableSessions
+      .filter((s) => !s.teacher_id || activeTeacherIds.has(s.teacher_id))
+      .map((s) => s.id);
+    const invalidTeacherSessionIds = processableSessions
+      .filter((s) => s.teacher_id && !activeTeacherIds.has(s.teacher_id))
+      .map((s) => s.id);
+
+    // 老師有效的課堂：恢復並保留 teacher_id
+    if (validTeacherSessionIds.length > 0) {
+      const { error: reopenError } = await supabase
+        .from('sessions')
+        .update({ status: 'scheduled' })
+        .eq('org_id', orgId)
+        .in('id', validTeacherSessionIds);
+
+      if (reopenError) {
+        return c.json({ error: reopenError.message, code: 'DB_ERROR' }, 400);
+      }
+    }
+
+    // 老師已封存的課堂：恢復但清空 teacher_id，設為 unassigned
+    if (invalidTeacherSessionIds.length > 0) {
+      const { error: reopenUnassignedError } = await supabase
+        .from('sessions')
+        .update({ status: 'scheduled', assignment_status: 'unassigned', teacher_id: null })
+        .eq('org_id', orgId)
+        .in('id', invalidTeacherSessionIds);
+
+      if (reopenUnassignedError) {
+        return c.json({ error: reopenUnassignedError.message, code: 'DB_ERROR' }, 400);
+      }
     }
 
     const { data: profile } = await supabase

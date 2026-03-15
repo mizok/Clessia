@@ -223,11 +223,11 @@
                       (onClick)="openEditDialog(staff)"
                     />
                     <p-button
-                      icon="pi pi-trash"
+                      icon="pi pi-box"
                       [rounded]="true"
                       [text]="true"
                       severity="danger"
-                      pTooltip="刪除"
+                      pTooltip="封存"
                       tooltipPosition="top"
                       (onClick)="confirmArchive(staff)"
                     />
@@ -307,8 +307,8 @@
                   class="staff-card__action-btn staff-card__action-btn--delete"
                   (click)="confirmArchive(staff)"
                 >
-                  <i class="pi pi-trash"></i>
-                  <span>刪除</span>
+                  <i class="pi pi-box"></i>
+                  <span>封存</span>
                 </button>
               </div>
             </article>

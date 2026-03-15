@@ -126,6 +126,19 @@ select {
   font-size: inherit;
 }
 
+.session-filters-panel .p-multiselect-header {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+}
+
+.session-filters-panel .p-multiselect-filter-container,
+.session-filters-panel app-ime-filter-input {
+  width: 100%;
+}
+
+.session-filters-panel .p-multiselect-list-container {
+  padding-top: 0;
+}
+
 /* =============================================================================
    Tooltip Styles
    ============================================================================= */

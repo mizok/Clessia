@@ -168,6 +168,10 @@ export class SessionsPage implements OnInit {
   );
 
   protected readonly unassignedCount = signal(0);
+  protected readonly filteredUnassignedCount = signal(0);
+  protected readonly displayedUnassignedCount = computed(() =>
+    this.hasActiveFilters() ? this.filteredUnassignedCount() : this.unassignedCount(),
+  );
 
   // ── Selection state ────────────────────────────────────────────────────
   protected readonly selectedIds = signal<Set<string>>(new Set());
@@ -509,6 +513,7 @@ export class SessionsPage implements OnInit {
           this.sessions.set(res.data);
           this.totalSessions.set(res.meta.total);
           this.unassignedCount.set(res.meta.unassignedCount);
+          this.filteredUnassignedCount.set(res.meta.filteredUnassignedCount);
           this.loading.set(false);
         },
         error: () => {

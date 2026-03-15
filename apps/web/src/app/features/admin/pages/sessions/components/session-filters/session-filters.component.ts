@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { DatePickerModule } from 'primeng/datepicker';
@@ -6,6 +6,7 @@ import { MultiSelectModule } from 'primeng/multiselect';
 import type { Campus } from '@core/campuses.service';
 import type { Course } from '@core/courses.service';
 import type { Staff } from '@core/staff.service';
+import { ImeFilterInputComponent } from '@shared/components/ime-filter-input/ime-filter-input.component';
 
 export const UNASSIGNED_TEACHER_ID = '__unassigned__';
 
@@ -22,6 +23,8 @@ export interface TeacherSelectOption {
   readonly id: string;
   readonly displayName: string;
   readonly subjectNames?: string[];
+  readonly campusIds?: string[];
+  readonly campusNames?: string[];
 }
 
 export interface TeacherOptionGroup {
@@ -43,7 +46,7 @@ interface SessionFilterClassDisplayOption extends SessionFilterClassOption {
 
 @Component({
   selector: 'app-session-filters',
-  imports: [FormsModule, ButtonModule, DatePickerModule, MultiSelectModule],
+  imports: [FormsModule, ButtonModule, DatePickerModule, MultiSelectModule, ImeFilterInputComponent],
   templateUrl: './session-filters.component.html',
   styleUrl: './session-filters.component.scss',
 })
@@ -75,13 +78,52 @@ export class SessionFiltersComponent {
 
   protected readonly statusOptions = SESSION_STATUS_OPTIONS;
 
+  // ── IME-aware filter queries ─────────────────────────────────────────────
+  protected readonly campusFilterQuery = signal('');
+  protected readonly courseFilterQuery = signal('');
+  protected readonly teacherFilterQuery = signal('');
+  protected readonly classFilterQuery = signal('');
+
+  protected readonly filteredCampusOptions = computed(() =>
+    matchesAll(this.campuses(), this.campusFilterQuery(), (c) => [c.name]),
+  );
+
+  protected readonly filteredCourseOptions = computed(() =>
+    matchesAll(this.availableCourses(), this.courseFilterQuery(), (c) => [
+      c.name,
+      c.campusName ?? this.campusNameById().get(c.campusId),
+    ]),
+  );
+
+  protected readonly filteredClassOptions = computed(() =>
+    matchesAll(this.classDisplayOptions(), this.classFilterQuery(), (cl) => [
+      cl.name,
+      cl.courseName,
+      cl.campusName,
+    ]),
+  );
+
   protected readonly teacherOptionGroups = computed<TeacherOptionGroup[]>(() => {
-    const groups: TeacherOptionGroup[] = [
-      { label: '篩選', items: [{ id: UNASSIGNED_TEACHER_ID, displayName: '未指派' }] },
-    ];
-    const teachers = this.filteredTeachers();
-    if (teachers.length > 0) {
-      groups.push({ label: '老師', items: teachers });
+    const query = this.teacherFilterQuery();
+    const campusMap = this.campusNameById();
+
+    const allTeachers = this.filteredTeachers().map((t) => ({
+      ...t,
+      campusNames: t.campusIds.map((id) => campusMap.get(id)).filter((n): n is string => !!n),
+    }));
+
+    const matchedTeachers = matchesAll(allTeachers, query, (t) => [
+      t.displayName,
+      ...(t.subjectNames ?? []),
+      ...(t.campusNames ?? []),
+    ]);
+
+    const groups: TeacherOptionGroup[] = [];
+    if (!query || '未指派'.includes(query)) {
+      groups.push({ label: '篩選', items: [{ id: UNASSIGNED_TEACHER_ID, displayName: '未指派' }] });
+    }
+    if (matchedTeachers.length > 0) {
+      groups.push({ label: '老師', items: matchedTeachers });
     }
     return groups;
   });
@@ -147,6 +189,11 @@ export class SessionFiltersComponent {
     return teacher.subjectNames.join('、');
   }
 
+  protected getTeacherCampusLabel(teacher: TeacherSelectOption): string | null {
+    if (!teacher.campusNames || teacher.campusNames.length === 0) return null;
+    return teacher.campusNames.join('、');
+  }
+
   protected getClassMetaLabel(classOption: SessionFilterClassDisplayOption): string | null {
     const parts = [classOption.courseName, classOption.campusName].filter(
       (value): value is string => !!value,
@@ -176,4 +223,16 @@ export class SessionFiltersComponent {
       .filter((id): id is string => id !== null);
     return Array.from(new Set(ids));
   }
+}
+
+function matchesAll<T>(
+  items: T[],
+  query: string,
+  fields: (item: T) => (string | null | undefined)[],
+): T[] {
+  if (!query) return items;
+  const q = query.toLowerCase();
+  return items.filter((item) =>
+    fields(item).some((f) => f && f.toLowerCase().includes(q)),
+  );
 }

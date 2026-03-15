@@ -119,6 +119,14 @@ const listRoute = createRoute({
         },
       },
     },
+    400: {
+      description: '資料庫錯誤',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+    },
   },
 });
 
@@ -158,7 +166,7 @@ app.openapi(listRoute, async (c) => {
   const { data, count, error } = await dbQuery;
 
   if (error) {
-    console.error('DB Error:', error);
+    return c.json({ error: error.message, code: 'DB_ERROR' }, 400);
   }
 
   const courses = (data || []).map((row) => mapCourse(row as Record<string, unknown>));
@@ -394,17 +402,6 @@ app.openapi(updateRoute, async (c) => {
     (existingCourse['is_active'] as boolean) &&
     body.deactivateMode === 'cancel_future_sessions';
 
-  const { data, error } = await supabase
-    .from('courses')
-    .update(updateData)
-    .eq('id', id)
-    .select('*, campuses(name), subjects(name)')
-    .single();
-
-  if (error || !data) {
-    return c.json({ error: '課程不存在', code: 'NOT_FOUND' }, 404);
-  }
-
   let cancelledFutureSessions = 0;
   if (shouldCancelFutureSessions) {
     const { data: classRows, error: classRowsError } = await supabase
@@ -422,7 +419,9 @@ app.openapi(updateRoute, async (c) => {
       .filter((classId): classId is string => !!classId);
 
     if (classIds.length > 0) {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Asia/Taipei',
+      }).format(new Date());
 
       // 查出要取消的課堂 IDs
       const { data: targetSessions, error: fetchError } = await supabase
@@ -471,12 +470,28 @@ app.openapi(updateRoute, async (c) => {
           .insert(changeRecords);
 
         if (insertError) {
+          // Rollback sessions
+          await supabase
+            .from('sessions')
+            .update({ status: 'scheduled' })
+            .in('id', sessionIds);
           return c.json({ error: insertError.message, code: 'DB_ERROR' }, 400);
         }
 
         cancelledFutureSessions = sessionIds.length;
       }
     }
+  }
+
+  const { data, error } = await supabase
+    .from('courses')
+    .update(updateData)
+    .eq('id', id)
+    .select('*, campuses(name), subjects(name)')
+    .single();
+
+  if (error || !data) {
+    return c.json({ error: '課程不存在', code: 'NOT_FOUND' }, 404);
   }
 
   logAudit(supabase, {

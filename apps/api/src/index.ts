@@ -2,6 +2,7 @@ import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { swaggerUI } from '@hono/swagger-ui';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { authMiddleware } from './middleware/auth';
 import { createAuth } from './auth';
 import { resolveCorsOrigin } from './lib/origins';
@@ -12,7 +13,6 @@ import subjectsRoute from './routes/subjects';
 import classesRoute from './routes/classes';
 import auditLogsRoute from './routes/audit-logs';
 import sessionsRoute from './routes/sessions';
-import type { SupabaseClient } from '@supabase/supabase-js';
 
 // ============================================================
 // Types

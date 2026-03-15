@@ -1,10 +1,9 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import type { AppEnv } from '../index';
 import { formatAuditClassResourceName, logAudit } from '../utils/audit';
-import { planBatchAssign } from '../domain/session-assignment/batch-assign-planner';
 import { buildSessionGenerationPlan } from '../domain/session-assignment/session-generation-planner';
 import { deriveAssignmentStatus } from '../domain/session-assignment/session-assignment.rules';
-import type { BatchAssignMode } from '../domain/session-assignment/session-assignment.types';
+import type { BatchAssignMode, BatchAssignPlanOutput, BatchAssignConflict } from '../domain/session-assignment/session-assignment.types';
 import {
   normalizeTime,
   toMinutes,
@@ -1716,26 +1715,85 @@ app.openapi(
 
     const mode = body.mode as BatchAssignMode;
     const dryRun = body.dryRun ?? false;
-    const plan = planBatchAssign({
-      mode,
-      includeAssigned: body.includeAssigned ?? false,
-      targetSessions: filteredSessions.map((session) => ({
-        id: session.id as string,
-        sessionDate: session.session_date as string,
-        startTime: normalizeTime(session.start_time as string),
-        endTime: normalizeTime(session.end_time as string),
-        status: session.status as 'scheduled' | 'completed' | 'cancelled',
-        assignmentStatus:
-          (session.assignment_status as 'assigned' | 'unassigned' | null) ??
-          deriveAssignmentStatus((session.teacher_id as string | null) ?? null),
-      })),
-      teacherBusySlots: (teacherBusySessions || []).map((session) => ({
-        sessionId: session.id as string,
-        sessionDate: session.session_date as string,
-        startTime: normalizeTime(session.start_time as string),
-        endTime: normalizeTime(session.end_time as string),
-      })),
-    });
+    const includeAssigned = body.includeAssigned ?? false;
+
+    // Inline planBatchAssign logic
+    const targetSessions = filteredSessions.map((session) => ({
+      id: session.id as string,
+      sessionDate: session.session_date as string,
+      startTime: normalizeTime(session.start_time as string),
+      endTime: normalizeTime(session.end_time as string),
+      status: session.status as 'scheduled' | 'completed' | 'cancelled',
+      assignmentStatus:
+        (session.assignment_status as 'assigned' | 'unassigned' | null) ??
+        deriveAssignmentStatus((session.teacher_id as string | null) ?? null),
+    }));
+    const teacherBusySlots = (teacherBusySessions || []).map((session) => ({
+      sessionId: session.id as string,
+      sessionDate: session.session_date as string,
+      startTime: normalizeTime(session.start_time as string),
+      endTime: normalizeTime(session.end_time as string),
+    }));
+
+    const updatedIds: string[] = [];
+    const conflicts: BatchAssignConflict[] = [];
+    let skippedNotEligible = 0;
+    const conflictSessionIds = new Set<string>();
+
+    for (const session of targetSessions) {
+      const eligible =
+        session.status === 'scheduled' &&
+        (session.assignmentStatus === 'unassigned' || includeAssigned);
+      if (!eligible) {
+        skippedNotEligible += 1;
+        continue;
+      }
+
+      if (mode === 'force') {
+        updatedIds.push(session.id);
+        continue;
+      }
+
+      const sessionConflicts = teacherBusySlots.filter(
+        (busy) =>
+          busy.sessionDate === session.sessionDate &&
+          busy.sessionId !== session.id &&
+          isTimeOverlap(session.startTime, session.endTime, busy.startTime, busy.endTime),
+      );
+
+      if (sessionConflicts.length > 0) {
+        conflictSessionIds.add(session.id);
+        for (const conflict of sessionConflicts) {
+          conflicts.push({
+            sessionId: session.id,
+            sessionDate: session.sessionDate,
+            startTime: session.startTime,
+            endTime: session.endTime,
+            conflictWithSessionId: conflict.sessionId,
+          });
+        }
+        continue;
+      }
+
+      updatedIds.push(session.id);
+    }
+
+    let plan: BatchAssignPlanOutput;
+    if (mode === 'strict' && conflicts.length > 0) {
+      plan = {
+        updatedIds: [],
+        skippedConflicts: conflictSessionIds.size,
+        skippedNotEligible,
+        conflicts,
+      };
+    } else {
+      plan = {
+        updatedIds,
+        skippedConflicts: conflictSessionIds.size,
+        skippedNotEligible,
+        conflicts,
+      };
+    }
 
     if (!dryRun && mode === 'strict' && plan.conflicts.length > 0) {
       return c.json(
